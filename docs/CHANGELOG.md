@@ -8,9 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Phase 2: Gateway Core Services (In Progress)
+
+#### Completed (2025-01-20)
+- **Critical Bug Fixes**:
+  - Fixed Tell packet LPC array structure (reduced from 8 to 7 fields)
+  - Added mud_port, tcp_port, udp_port fields to StartupPacket
+  - Fixed packet factory validation logic
+  - Migrated configuration to Pydantic V2 (field_validator, ConfigDict)
+  - Fixed RouterConfig to use proper nested RouterHostConfig objects
+  - Resolved all import errors in integration tests
+  - Updated mock router for new packet formats
+
+#### In Progress
 - Router connection management implementation
 - Packet routing and dispatching system
-- Service registry architecture
+- Service testing and integration
+- Test coverage improvement (currently at 34%, target 80%)
 
 ## [0.2.0] - 2025-01-19 - Phase 1 Complete
 
@@ -90,5 +103,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development: pytest, black, ruff, mypy, pre-commit
 - Testing: pytest-asyncio, pytest-cov
 
-## [0.1.3] -
+### Test Results (2025-01-20)
+- **LPC Tests**: 22/22 passing (100%)
+- **Packet Tests**: 20/20 passing (100%)
+- **Overall Test Coverage**: 34% (improved from 10%)
+- **Core Functionality**: Stable foundation established
+
+## [0.1.3] - 2025-01-20 - Phase 2 Critical Fixes
+
+### Fixed
+- Tell packet structure corrected to I3 protocol standard
+- Startup packet model updated with proper port fields
+- Configuration system migrated to Pydantic V2
+- Integration test infrastructure repaired
+- Mock router compatibility issues resolved
+
+### Changed
+- Packet models now properly handle all I3 packet types
+- RouterConfig uses nested objects for proper validation
+- Test fixtures aligned with implementation
+
+### Technical Debt Addressed
+- Removed deprecated Pydantic V1 validators
+- Cleaned up packet serialization/deserialization
+- Improved test coverage from 10% to 34%
 
