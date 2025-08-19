@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class ServiceConfig(BaseModel):
@@ -170,14 +170,12 @@ class Settings(BaseModel):
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     development: DevelopmentConfig = Field(default_factory=DevelopmentConfig)
     
-    @validator("gateway")
+    @field_validator("gateway")
+    @classmethod
     def validate_gateway_auth(cls, v: GatewayConfig) -> GatewayConfig:
         """Validate gateway authentication settings."""
         if v.auth.enabled and not v.auth.secret:
             raise ValueError("Gateway auth is enabled but no secret provided")
         return v
     
-    class Config:
-        """Pydantic configuration."""
-        
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)

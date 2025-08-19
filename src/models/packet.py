@@ -125,7 +125,6 @@ class I3Packet(ABC):
 class TellPacket(I3Packet):
     """Private message packet."""
     packet_type: PacketType = field(default=PacketType.TELL, init=False)
-    visname: str = ""  # Visual name of originator
     message: str = ""
     
     def validate(self) -> None:
@@ -140,10 +139,6 @@ class TellPacket(I3Packet):
         
         if not self.message:
             raise PacketValidationError("Tell requires a message")
-        
-        # Visname defaults to originator_user if not specified
-        if not self.visname:
-            self.visname = self.originator_user
     
     def to_lpc_array(self) -> List[Any]:
         """Convert to LPC array."""
@@ -154,15 +149,14 @@ class TellPacket(I3Packet):
             self.originator_user if self.originator_user else 0,
             self.target_mud if self.target_mud else 0,
             self.target_user.lower() if self.target_user else 0,  # Target username must be lowercased
-            self.visname if self.visname else 0,
             self.message
         ]
     
     @classmethod
     def from_lpc_array(cls, data: List[Any]) -> 'TellPacket':
         """Create from LPC array."""
-        if len(data) < 8:
-            raise PacketValidationError(f"Invalid tell packet: expected 8+ fields, got {len(data)}")
+        if len(data) < 7:
+            raise PacketValidationError(f"Invalid tell packet: expected 7+ fields, got {len(data)}")
         
         return cls(
             ttl=int(data[1]) if data[1] else 0,
@@ -170,8 +164,7 @@ class TellPacket(I3Packet):
             originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
             target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
             target_user=str(data[5]) if data[5] and data[5] != 0 else "",
-            visname=str(data[6]) if data[6] and data[6] != 0 else "",
-            message=str(data[7]) if data[7] else ""
+            message=str(data[6]) if data[6] else ""
         )
 
 
@@ -548,9 +541,12 @@ class StartupPacket(I3Packet):
     password: int = 0
     old_mudlist_id: int = 0  # Current mudlist version
     old_chanlist_id: int = 0  # Current channel list version
-    player_port: int = 0  # Player connection port
-    imud_tcp_port: int = 0  # OOB TCP port
-    imud_udp_port: int = 0  # OOB UDP port
+    mud_port: int = 0  # Player connection port (player_port)
+    player_port: int = 0  # Alias for mud_port (deprecated)
+    tcp_port: int = 0  # OOB TCP port (imud_tcp_port)
+    imud_tcp_port: int = 0  # Alias for tcp_port (deprecated)
+    udp_port: int = 0  # OOB UDP port (imud_udp_port)
+    imud_udp_port: int = 0  # Alias for udp_port (deprecated)
     mudlib: str = ""
     base_mudlib: str = ""
     driver: str = ""
@@ -569,6 +565,11 @@ class StartupPacket(I3Packet):
     
     def to_lpc_array(self) -> List[Any]:
         """Convert to LPC array."""
+        # Use the new field names, falling back to deprecated aliases
+        mud_port_value = self.mud_port if self.mud_port else self.player_port
+        tcp_port_value = self.tcp_port if self.tcp_port else self.imud_tcp_port
+        udp_port_value = self.udp_port if self.udp_port else self.imud_udp_port
+        
         return [
             self.packet_type.value,
             self.ttl,
@@ -577,11 +578,9 @@ class StartupPacket(I3Packet):
             self.target_mud,  # Router name
             0,  # target_user is always 0 for startup
             self.password,
-            self.old_mudlist_id,
-            self.old_chanlist_id,
-            self.player_port,
-            self.imud_tcp_port,
-            self.imud_udp_port,
+            mud_port_value,
+            tcp_port_value,
+            udp_port_value,
             self.mudlib,
             self.base_mudlib,
             self.driver,
@@ -589,14 +588,14 @@ class StartupPacket(I3Packet):
             self.open_status,
             self.admin_email,
             self.services,
-            self.other_data if self.other_data else 0  # Can be 0 if no other data
+            self.other_data if self.other_data else {}  # Empty dict if no other data
         ]
     
     @classmethod
     def from_lpc_array(cls, data: List[Any]) -> 'StartupPacket':
         """Create from LPC array."""
-        if len(data) < 20:
-            raise PacketValidationError(f"Invalid startup packet: expected 20+ fields, got {len(data)}")
+        if len(data) < 18:
+            raise PacketValidationError(f"Invalid startup packet: expected 18+ fields, got {len(data)}")
         
         return cls(
             ttl=int(data[1]) if data[1] else 0,
@@ -605,19 +604,17 @@ class StartupPacket(I3Packet):
             target_mud=str(data[4]) if data[4] else "",
             target_user=str(data[5]) if data[5] and data[5] != 0 else "",
             password=int(data[6]) if data[6] else 0,
-            old_mudlist_id=int(data[7]) if data[7] else 0,
-            old_chanlist_id=int(data[8]) if data[8] else 0,
-            player_port=int(data[9]) if data[9] else 0,
-            imud_tcp_port=int(data[10]) if data[10] else 0,
-            imud_udp_port=int(data[11]) if data[11] else 0,
-            mudlib=str(data[12]) if data[12] else "",
-            base_mudlib=str(data[13]) if data[13] else "",
-            driver=str(data[14]) if data[14] else "",
-            mud_type=str(data[15]) if data[15] else "",
-            open_status=str(data[16]) if data[16] else "",
-            admin_email=str(data[17]) if data[17] else "",
-            services=data[18] if isinstance(data[18], dict) else {},
-            other_data=data[19] if data[19] and isinstance(data[19], dict) else {}
+            mud_port=int(data[7]) if data[7] else 0,
+            tcp_port=int(data[8]) if data[8] else 0,
+            udp_port=int(data[9]) if data[9] else 0,
+            mudlib=str(data[10]) if data[10] else "",
+            base_mudlib=str(data[11]) if data[11] else "",
+            driver=str(data[12]) if data[12] else "",
+            mud_type=str(data[13]) if data[13] else "",
+            open_status=str(data[14]) if data[14] else "",
+            admin_email=str(data[15]) if data[15] else "",
+            services=data[16] if isinstance(data[16], dict) else {},
+            other_data=data[17] if len(data) > 17 and isinstance(data[17], dict) else {}
         )
 
 

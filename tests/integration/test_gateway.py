@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 from src.gateway import I3Gateway
-from src.config.models import Settings, MudConfig, RouterConfig, RouterEndpoint, ServicesConfig
+from src.config.models import Settings, MudConfig, RouterConfig, ServiceConfig, RouterHostConfig
 from src.models.packet import (
     PacketType, TellPacket, WhoPacket, LocatePacket,
     ChannelMessagePacket, StartupPacket
@@ -35,11 +35,10 @@ def gateway_settings():
         mud=MudConfig(
             name="TestGatewayMUD",
             port=4000,
-            password=0
+            admin_email="admin@test.mud"
         ),
         router=RouterConfig(
-            primary=RouterEndpoint(
-                name="*test",
+            primary=RouterHostConfig(
                 host="127.0.0.1",
                 port=8091
             )
@@ -49,12 +48,12 @@ def gateway_settings():
             "port": 8080,
             "state_dir": None
         },
-        services=ServicesConfig(
-            tell=True,
-            channel=True,
-            who=True,
-            finger=True,
-            locate=True
+        services=ServiceConfig(
+            tell=1,
+            channel=1,
+            who=1,
+            finger=1,
+            locate=1
         )
     )
 

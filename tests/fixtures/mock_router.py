@@ -218,7 +218,7 @@ class MockRouter:
         mud_info = MockMudInfo(
             name=packet.originator_mud,
             address="127.0.0.1",
-            port=packet.player_port,
+            port=packet.mud_port if packet.mud_port else packet.player_port,
             driver=packet.driver,
             mudlib=packet.mudlib,
             services=packet.services
