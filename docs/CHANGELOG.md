@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Phase 3: Gateway API Protocol - IN PROGRESS (2025-01-20)
+### Phase 3: Gateway API Protocol - IN PROGRESS (2025-01-20) - 75% Complete
 
 #### Completed Components
 - **API Server Foundation** ✅
@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Channel management: join, leave, list, who, history
   - Administrative handlers: status, stats, ping, reconnect, shutdown
   
+- **Event Distribution System** ✅ (Milestone 3 Complete)
+  - Event dispatcher (`src/api/events.py`) with priority queuing
+  - Event types and models for all I3 packet types
+  - Subscription management (`src/api/subscriptions.py`) with filtering
+  - Message queue system (`src/api/queue.py`) for offline clients
+  - Event bridge (`src/api/event_bridge.py`) connecting I3 to API
+  - Gateway integration for automatic event generation
+  - Test coverage for event system (`tests/api/test_events.py`)
+  
 - **Configuration** ✅
   - Extended config models with complete API settings
   - WebSocket and TCP configuration options
@@ -31,11 +40,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Session management settings
 
 #### Pending Components
-- Event Distribution System (Milestone 3)
 - Authentication Middleware completion
 - Client Libraries (Python SDK)
-- Comprehensive test suite
-- API documentation
+- Comprehensive integration test suite
+- API documentation generation
+- Load testing and performance optimization
+
+### Event Distribution System Complete (2025-08-19)
+
+#### Milestone 3 Achievements
+- **Event Dispatcher Implementation**:
+  - Priority-based event queuing (1-10 priority levels)
+  - Asynchronous event distribution to subscribed sessions
+  - Event expiry with TTL support
+  - Permission-based event filtering
+  - Custom event filters per session
+  - Comprehensive statistics tracking
+
+- **Subscription Management**:
+  - Channel subscription tracking with listen-only mode
+  - Event type filtering and preferences
+  - MUD and user-based filtering options
+  - Activity tracking for subscriptions
+  - Automatic cleanup on session disconnect
+
+- **Message Queue System**:
+  - Priority queue implementation for offline message storage
+  - Configurable queue sizes with overflow handling
+  - Message TTL and automatic expiry
+  - Retry mechanism for failed deliveries
+  - Per-session queue management
+
+- **Event Bridge Integration**:
+  - Automatic event generation from I3 packets
+  - Support for all communication event types (tell, emoteto, channel messages)
+  - System event notifications (MUD online/offline, gateway reconnection)
+  - Integration with gateway packet processing pipeline
+  - Connection state change notifications
+
+- **Testing**:
+  - Comprehensive test suite for event system (`tests/api/test_events.py`)
+  - Unit tests for Event, EventFilter, and EventDispatcher classes
+  - Integration tests for full event flow
+  - Mock session testing with permission validation
+
+#### Integration Updates
+- API server now starts event dispatcher and queue manager
+- WebSocket sessions automatically registered with event system
+- Gateway packet processor sends packets to event bridge
+- Session cleanup includes event system unregistration
 
 ### Test Fixes (2025-08-19)
 

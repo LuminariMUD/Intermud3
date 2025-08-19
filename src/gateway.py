@@ -6,6 +6,7 @@ from typing import Any
 
 import structlog
 
+from .api.event_bridge import event_bridge
 from .config.models import Settings
 from .models.packet import I3Packet, PacketFactory, PacketType
 from .network import ConnectionManager, ConnectionState, RouterInfo
@@ -181,6 +182,9 @@ class I3Gateway:
         if state == ConnectionState.CONNECTED:
             # Send startup packet
             await self._send_startup()
+        elif state == ConnectionState.READY:
+            # Notify event bridge of reconnection
+            await event_bridge.notify_gateway_reconnect()
         elif state == ConnectionState.DISCONNECTED:
             # Clear router-specific state
             pass
@@ -244,9 +248,13 @@ class I3Gateway:
                 # This will handle local vs remote routing
                 elif self.router_service:
                     await self.router_service.route_packet(packet)
+                    # Also send packet to event bridge for API event generation
+                    await event_bridge.process_incoming_packet(packet)
                 else:
                     # Fallback to direct service routing
                     await self.service_manager.queue_packet(packet)
+                    # Also send packet to event bridge for API event generation
+                    await event_bridge.process_incoming_packet(packet)
 
             except TimeoutError:
                 continue

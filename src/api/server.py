@@ -17,6 +17,10 @@ from aiohttp.web_ws import WebSocketResponse
 
 from src.api.protocol import JSONRPCProtocol, JSONRPCRequest, JSONRPCError
 from src.api.session import Session, SessionManager
+from src.api.events import event_dispatcher
+from src.api.event_bridge import event_bridge
+from src.api.subscriptions import subscription_manager
+from src.api.queue import message_queue_manager
 from src.config.models import APIConfig
 from src.utils.logging import get_logger
 from src.utils.shutdown import ShutdownManager
@@ -61,6 +65,13 @@ class APIServer:
     async def start(self):
         """Start both WebSocket and TCP servers."""
         try:
+            # Start event system components
+            await event_dispatcher.start()
+            await message_queue_manager.start()
+            event_bridge.start()
+            
+            logger.info("Event system components started")
+            
             # Create web application
             self.app = web.Application()
             
@@ -98,6 +109,7 @@ class APIServer:
             # Start background tasks
             asyncio.create_task(self._cleanup_sessions())
             asyncio.create_task(self._ping_websockets())
+            asyncio.create_task(self._process_event_queues())
             
         except Exception as e:
             logger.error(f"Failed to start API server: {e}")
@@ -124,6 +136,11 @@ class APIServer:
         
         # Cleanup sessions
         await self.session_manager.cleanup()
+        
+        # Stop event system components
+        event_bridge.stop()
+        await event_dispatcher.stop()
+        await message_queue_manager.stop()
         
         logger.info("API server stopped")
 
@@ -187,6 +204,10 @@ class APIServer:
                 # Authenticate immediately if API key in headers
                 session = await self.session_manager.authenticate(api_key)
                 session.websocket = ws
+                
+                # Register session with event dispatcher
+                event_dispatcher.register_session(session)
+                
                 logger.info(f"WebSocket authenticated for {session.mud_name}")
             
             # Process messages
@@ -202,6 +223,9 @@ class APIServer:
                             if api_key:
                                 session = await self.session_manager.authenticate(api_key)
                                 session.websocket = ws
+                                
+                                # Register session with event dispatcher
+                                event_dispatcher.register_session(session)
                                 
                                 # Send success response
                                 response = self.protocol.format_response(
@@ -253,6 +277,10 @@ class APIServer:
             # Cleanup
             self._websockets.discard(ws)
             if session:
+                # Unregister from event dispatcher
+                event_dispatcher.unregister_session(session.session_id)
+                subscription_manager.cleanup_session(session.session_id)
+                
                 session.websocket = None
                 await self.session_manager.disconnect(session)
             
@@ -371,6 +399,20 @@ class APIServer:
                 await asyncio.sleep(ping_interval)
             except Exception as e:
                 logger.error(f"Error in WebSocket ping: {e}")
+    
+    async def _process_event_queues(self):
+        """Process queued messages for sessions."""
+        while not self._shutdown_event.is_set():
+            try:
+                # Process message queues for all active sessions
+                for session in self.session_manager.get_all_sessions():
+                    if session.is_connected() and session.message_queue:
+                        await session.flush_queue()
+                
+                # Small delay to prevent busy loop
+                await asyncio.sleep(0.1)
+            except Exception as e:
+                logger.error(f"Error processing event queues: {e}")
 
     async def handle_health(self, request: Request) -> web.Response:
         """Handle health check request."""
