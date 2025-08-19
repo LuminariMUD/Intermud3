@@ -96,7 +96,11 @@ class TestTellPacket:
             )
     
     def test_tell_packet_to_lpc_array(self):
-        """Test converting tell packet to LPC array."""
+        """Test converting tell packet to LPC array.
+        
+        CRITICAL: Tell packets have EXACTLY 8 FIELDS!
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
         packet = TellPacket(
             ttl=200,
             originator_mud="TestMUD",
@@ -108,6 +112,7 @@ class TestTellPacket:
         
         lpc_array = packet.to_lpc_array()
         
+        # CRITICAL: Tell packets have 8 fields - visname at position 6!
         assert lpc_array == [
             "tell",
             200,
@@ -115,11 +120,17 @@ class TestTellPacket:
             "testuser",
             "TargetMUD",
             "targetuser",
+            "testuser",  # Position 6: visname defaults to originator_user
             "Hello, World!"
         ]
     
     def test_tell_packet_from_lpc_array(self):
-        """Test creating tell packet from LPC array."""
+        """Test creating tell packet from LPC array.
+        
+        CRITICAL: Tell packets have EXACTLY 8 FIELDS!
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
+        # CRITICAL: Tell packets have 8 fields - visname at position 6!
         lpc_array = [
             "tell",
             200,
@@ -127,6 +138,7 @@ class TestTellPacket:
             "testuser",
             "TargetMUD",
             "targetuser",
+            "testuser",  # Position 6: visname
             "Hello, World!"
         ]
         
@@ -336,7 +348,11 @@ class TestStartupPacket:
             )
     
     def test_startup_packet_to_lpc_array(self):
-        """Test converting startup packet to LPC array."""
+        """Test converting startup packet to LPC array.
+        
+        StartupPacket has 20 fields (indices 0-19) including old_mudlist_id, 
+        old_chanlist_id, and other_data field.
+        """
         packet = StartupPacket(
             ttl=200,
             originator_mud="TestMUD",
@@ -351,17 +367,23 @@ class TestStartupPacket:
         
         lpc_array = packet.to_lpc_array()
         
-        assert len(lpc_array) == 18
+        # StartupPacket generates 20 fields (0-19)
+        assert len(lpc_array) == 20
         assert lpc_array[0] == "startup-req-3"
         assert lpc_array[6] == 12345  # password
-        assert lpc_array[7] == 4000   # mud_port
+        assert lpc_array[9] == 4000   # mud_port (not index 7!)
 
 
 class TestPacketFactory:
     """Test PacketFactory functionality."""
     
     def test_create_tell_packet(self):
-        """Test factory creates correct tell packet."""
+        """Test factory creates correct tell packet.
+        
+        CRITICAL: Tell packets have EXACTLY 8 FIELDS!
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
+        # CRITICAL: Tell packets have 8 fields - visname at position 6!
         lpc_array = [
             "tell",
             200,
@@ -369,6 +391,7 @@ class TestPacketFactory:
             "testuser",
             "TargetMUD",
             "targetuser",
+            "testuser",  # Position 6: visname
             "Hello"
         ]
         
@@ -397,33 +420,38 @@ class TestPacketFactory:
             assert packet.channel == "chat"
     
     def test_create_startup_packet(self):
-        """Test factory creates correct startup packet."""
+        """Test factory creates correct startup packet.
+        
+        StartupPacket has 20 fields including old_mudlist_id and old_chanlist_id.
+        """
         lpc_array = [
             "startup-req-3",
-            200,
-            "TestMUD",
-            "",
-            "*i3",
-            "",
-            12345,  # password
-            4000,   # mud_port
-            4001,   # tcp_port
-            0,      # udp_port
-            "custom",  # mudlib
-            "LPMud",   # base_mudlib
-            "DGD",     # driver
-            "MUD",     # mud_type
-            "open",    # open_status
+            200,              # ttl
+            "TestMUD",        # originator_mud
+            "",               # originator_user
+            "*i3",            # target_mud
+            "",               # target_user
+            12345,            # password
+            0,                # old_mudlist_id
+            0,                # old_chanlist_id
+            4000,             # mud_port
+            4001,             # tcp_port
+            0,                # udp_port
+            "custom",         # mudlib
+            "LPMud",          # base_mudlib
+            "DGD",            # driver
+            "MUD",            # mud_type
+            "open",           # open_status
             "admin@test.mud",  # admin_email
-            {"tell": 1},  # services
-            {}  # other_data
+            {"tell": 1},      # services
+            {}                # other_data
         ]
         
         packet = PacketFactory.create_packet(lpc_array)
         
         assert isinstance(packet, StartupPacket)
         assert packet.password == 12345
-        assert packet.mud_port == 4000
+        assert packet.mud_port == 4000  # Now at correct index
     
     def test_create_error_packet(self):
         """Test factory creates correct error packet."""

@@ -449,7 +449,7 @@ class TestSendingMessages:
         self, channel_service, mock_gateway
     ):
         """Test sending message uses username as default visname."""
-        with patch('src.services.channel.ChannelMessagePacket') as MockPacket:
+        with patch('src.models.packet.ChannelMessagePacket') as MockPacket:
             mock_packet = Mock()
             MockPacket.return_value = mock_packet
             

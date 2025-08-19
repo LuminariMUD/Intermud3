@@ -50,7 +50,6 @@ def sample_tell_packet():
         originator_user="sender",
         target_mud="TestMUD",
         target_user="receiver",
-        visname="Sender",
         message="Hello!"
     )
 
@@ -66,7 +65,6 @@ def sample_channel_packet():
         target_mud="0",  # Broadcast
         target_user="",
         channel="gossip",
-        visname="Sender",
         message="Channel message"
     )
 
@@ -80,7 +78,6 @@ def sample_remote_packet():
         originator_user="sender",
         target_mud="RemoteMUD",  # Different target
         target_user="receiver",
-        visname="Sender",
         message="Remote message"
     )
 
@@ -318,7 +315,6 @@ class TestBroadcastRouting:
             target_mud=0,  # Integer zero
             target_user="",
             channel="gossip",
-            visname="Sender",
             message="Broadcast message"
         )
         
@@ -424,7 +420,7 @@ class TestErrorHandling:
         )
         
         error_packet = mock_gateway.send_packet.call_args[0][0]
-        assert error_packet.error_packet == sample_remote_packet.to_lpc_array()
+        assert error_packet.bad_packet == sample_remote_packet.to_lpc_array()
 
 
 class TestPacketValidation:
@@ -531,7 +527,6 @@ class TestRoutingDestinations:
             originator_user="sender",
             target_mud="TestMUD",  # Same as gateway MUD name
             target_user="receiver",
-            visname="Sender",
             message="Local message"
         )
         
@@ -550,7 +545,6 @@ class TestRoutingDestinations:
             originator_user="sender",
             target_mud="testmud",  # lowercase
             target_user="receiver",
-            visname="Sender",
             message="Case test"
         )
         
@@ -572,7 +566,6 @@ class TestRoutingDestinations:
             target_mud="0",  # String
             target_user="",
             channel="gossip",
-            visname="Sender",
             message="String broadcast"
         )
         
@@ -585,7 +578,6 @@ class TestRoutingDestinations:
             target_mud=0,  # Integer
             target_user="",
             channel="gossip",
-            visname="Sender",
             message="Integer broadcast"
         )
         
@@ -612,7 +604,6 @@ class TestConcurrentRouting:
                 originator_user=f"sender{i}",
                 target_mud="TestMUD",
                 target_user=f"receiver{i}",
-                visname=f"Sender{i}",
                 message=f"Message {i}"
             )
             packets.append(packet)
@@ -639,7 +630,6 @@ class TestConcurrentRouting:
                 originator_user=f"sender{i}",
                 target_mud="RemoteMUD",
                 target_user=f"receiver{i}",
-                visname=f"Sender{i}",
                 message=f"Remote message {i}"
             )
             packets.append(packet)
@@ -660,20 +650,20 @@ class TestConcurrentRouting:
         local_packet = TellPacket(
             ttl=200, originator_mud="RemoteMUD", originator_user="sender1",
             target_mud="TestMUD", target_user="receiver1",
-            visname="Sender1", message="Local"
+            message="Local"
         )
         
         remote_packet = TellPacket(
             ttl=200, originator_mud="SourceMUD", originator_user="sender2",
             target_mud="RemoteMUD", target_user="receiver2",
-            visname="Sender2", message="Remote"
+            message="Remote"
         )
         
         broadcast_packet = ChannelPacket(
             packet_type=PacketType.CHANNEL_M, ttl=200,
             originator_mud="RemoteMUD", originator_user="sender3",
             target_mud="0", target_user="", channel="gossip",
-            visname="Sender3", message="Broadcast"
+            message="Broadcast"
         )
         
         tasks = [
@@ -701,7 +691,6 @@ class TestEdgeCases:
             originator_user="sender",
             target_mud=None,  # None target
             target_user="receiver",
-            visname="Sender",
             message="Null target"
         )
         
@@ -723,7 +712,6 @@ class TestEdgeCases:
             originator_user="sender",
             target_mud="",  # Empty string
             target_user="receiver",
-            visname="Sender",
             message="Empty target"
         )
         
@@ -779,7 +767,7 @@ class TestEdgeCases:
                 packet_type=PacketType.CHANNEL_M, ttl=200,
                 originator_mud="RemoteMUD", originator_user="user",
                 target_mud="0", target_user="", channel="gossip",
-                visname="User", message="Test"
+                message="Test"
             ),
         ]
         

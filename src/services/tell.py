@@ -93,13 +93,16 @@ class TellService(BaseService):
                 target_user=packet.originator_user,
                 error_code="unk-user",
                 error_message=f"User {packet.target_user} is not online",
-                error_packet=packet.to_lpc_array(),
+                bad_packet=packet.to_lpc_array(),  # Note: ErrorPacket uses 'bad_packet' not 'error_packet'
             )
 
         # Store in recent tells for reply functionality
         self.recent_tells[packet.target_user] = f"{packet.originator_mud}:{packet.originator_user}"
 
         # Add to history
+        # IMPORTANT: Both TellPacket and EmotetoPacket HAVE a visname attribute
+        # This is REQUIRED by the I3 protocol specification
+        # visname is the visual/display name of the sender (can differ from username)
         if packet.target_user not in self.tell_history:
             self.tell_history[packet.target_user] = []
 
@@ -107,7 +110,7 @@ class TellService(BaseService):
             {
                 "from_mud": packet.originator_mud,
                 "from_user": packet.originator_user,
-                "visname": packet.visname,
+                "visname": packet.visname,  # Direct access - TellPacket ALWAYS has visname per I3 spec
                 "message": packet.message,
                 "timestamp": asyncio.get_event_loop().time(),
             }
@@ -163,7 +166,7 @@ class TellService(BaseService):
                 target_user=packet.originator_user,
                 error_code="unk-user",
                 error_message=f"User {packet.target_user} is not online",
-                error_packet=packet.to_lpc_array(),
+                bad_packet=packet.to_lpc_array(),  # Note: ErrorPacket uses 'bad_packet' not 'error_packet'
             )
 
         # Store in recent tells for reply functionality

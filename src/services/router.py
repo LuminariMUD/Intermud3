@@ -61,6 +61,12 @@ class RouterService(BaseService):
         # Decrement TTL for forwarding
         packet.ttl -= 1
 
+        # Check for gateway
+        if not self.gateway:
+            self.logger.error("No gateway available for routing")
+            self.packets_dropped += 1
+            return False
+
         # Determine routing destination
         if packet.target_mud == self.gateway.settings.mud.name:
             # Local delivery
@@ -107,7 +113,13 @@ class RouterService(BaseService):
             True if routed successfully
         """
         # Check if target MUD exists in mudlist
-        mud_info = await self.state_manager.get_mud(packet.target_mud)
+        try:
+            mud_info = await self.state_manager.get_mud(packet.target_mud)
+        except Exception as e:
+            self.logger.error("Error getting MUD info", target_mud=packet.target_mud, error=str(e))
+            self.packets_dropped += 1
+            return False
+            
         if not mud_info:
             self.logger.warning("Target MUD not found in mudlist", target_mud=packet.target_mud)
             # Send error packet back to originator
@@ -185,6 +197,10 @@ class RouterService(BaseService):
             error_code: Error code (e.g., "unk-dst", "not-imp")
             error_message: Human-readable error message
         """
+        if not self.gateway:
+            self.logger.warning("Cannot send error reply without gateway")
+            return
+
         from ..models.packet import ErrorPacket
 
         error_packet = ErrorPacket(
@@ -195,11 +211,10 @@ class RouterService(BaseService):
             target_user=original_packet.originator_user,
             error_code=error_code,
             error_message=error_message,
-            error_packet=original_packet.to_lpc_array(),
+            bad_packet=original_packet.to_lpc_array(),
         )
 
-        if self.gateway:
-            await self.gateway.send_packet(error_packet)
+        await self.gateway.send_packet(error_packet)
 
     async def handle_packet(self, packet: I3Packet) -> I3Packet | None:
         """Handle incoming packet for routing.

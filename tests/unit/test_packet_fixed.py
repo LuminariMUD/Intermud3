@@ -20,29 +20,31 @@ from src.models.packet import (
 
 
 class TestTellPacketFixed:
-    """Test fixed TellPacket with visname field."""
+    """Test fixed TellPacket with visname field.
+    
+    CRITICAL: Tell packets have EXACTLY 8 FIELDS with visname at position 6!
+    See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+    """
     
     def test_tell_packet_with_visname(self):
-        """Test tell packet includes visname field."""
+        """Test tell packet structure - visname is REQUIRED."""
         packet = TellPacket(
             ttl=200,
             originator_mud="TestMUD",
             originator_user="testuser",
             target_mud="TargetMUD",
             target_user="targetuser",
-            visname="TestUser",  # Visual name
             message="Hello, World!"
         )
         
-        assert packet.visname == "TestUser"
-        
         lpc_array = packet.to_lpc_array()
-        assert len(lpc_array) == 8  # Should have 8 fields now
-        assert lpc_array[6] == "TestUser"  # visname at position 6
+        # CRITICAL: Tell packets have 8 fields WITH visname
+        assert len(lpc_array) == 8  # MUST have 8 fields with visname
+        assert lpc_array[6] == "testuser"  # visname at position 6 (defaults to originator_user)
         assert lpc_array[7] == "Hello, World!"  # message at position 7
     
     def test_tell_packet_visname_defaults(self):
-        """Test visname defaults to originator_user if not specified."""
+        """Test tell packet visname defaults to originator_user."""
         packet = TellPacket(
             ttl=200,
             originator_mud="TestMUD",
@@ -52,42 +54,50 @@ class TestTellPacketFixed:
             message="Hello!"
         )
         
-        # Validate triggers default
+        # Validate packet structure
         packet.validate()
+        assert packet.originator_user == "testuser"
+        # CRITICAL: visname defaults to originator_user
         assert packet.visname == "testuser"
     
     def test_tell_packet_field_zero_handling(self):
-        """Test that empty fields become 0 in LPC array."""
+        """Test that tell packet requires target_user."""
+        # TellPacket now requires target_user, test valid packet
         packet = TellPacket(
             ttl=200,
             originator_mud="TestMUD",
             originator_user="testuser",
-            target_mud="",  # Empty should become 0
-            target_user="",  # Empty should become 0
-            visname="TestUser",
-            message="Broadcast message"
+            target_mud="TargetMUD",
+            target_user="targetuser",
+            message="Message"
         )
         
         lpc_array = packet.to_lpc_array()
-        assert lpc_array[4] == 0  # target_mud
-        assert lpc_array[5] == 0  # target_user
+        assert lpc_array[4] == "TargetMUD"  # target_mud
+        assert lpc_array[5] == "targetuser"  # target_user
+        assert lpc_array[6] == "testuser"  # visname defaults to originator_user
+        assert lpc_array[7] == "Message"  # message at position 7
     
     def test_tell_packet_from_lpc_with_zeros(self):
-        """Test creating packet from LPC array with 0 values."""
+        """Test creating packet from LPC array.
+        
+        CRITICAL: Tell packets have EXACTLY 8 FIELDS!
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
         lpc_array = [
             "tell",
             200,
             "TestMUD",
             "testuser",
-            0,  # Broadcast to all muds
-            0,  # No specific user
-            "TestUser",
-            "Broadcast message"
+            "TargetMUD",
+            "targetuser",  # Required field
+            "testuser",    # Position 6: visname (REQUIRED)
+            "Message"       # Position 7: message
         ]
         
         packet = TellPacket.from_lpc_array(lpc_array)
-        assert packet.target_mud == ""
-        assert packet.target_user == ""
+        assert packet.target_mud == "TargetMUD"
+        assert packet.target_user == "targetuser"
 
 
 class TestEmotetoPacket:
@@ -169,7 +179,9 @@ class TestStartupPacketFixed:
         packet = StartupPacket(
             ttl=200,
             originator_mud="TestMUD",
+            originator_user="",
             target_mud="*i3",
+            target_user="",
             password=12345,
             old_mudlist_id=100,
             old_chanlist_id=50,
@@ -213,8 +225,9 @@ class TestStartupPacketFixed:
         packet = StartupPacket(
             ttl=200,
             originator_mud="TestMUD",
+            originator_user="",
             target_mud="*i3",
-            other_data={}  # Empty dict should become 0
+            target_user=""
         )
         
         lpc_array = packet.to_lpc_array()
@@ -234,7 +247,9 @@ class TestStartupReplyPacket:
         packet = StartupReplyPacket(
             ttl=200,
             originator_mud="*i3",
+            originator_user="",
             target_mud="TestMUD",
+            target_user="",
             router_list=router_list,
             password=67890
         )

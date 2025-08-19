@@ -191,8 +191,15 @@ class TestFingerRequestHandling:
         self, finger_service, mock_state_manager
     ):
         """Test handling finger request with empty username."""
+        # Mock get_session to return None for empty username
+        mock_state_manager.get_session.return_value = None
+        
         packet = Mock(spec=I3Packet)
         packet.packet_type = PacketType.FINGER_REQ
+        packet.originator_mud = "RemoteMUD"
+        packet.originator_user = "requester"
+        packet.target_mud = "TestMUD"
+        packet.target_user = ""
         packet.to_lpc_array.return_value = [
             "finger-req", 200, "RemoteMUD", "requester", "TestMUD", 0, ""
         ]
@@ -233,6 +240,10 @@ class TestFingerRequestHandling:
         """Test handling finger request with numeric username field."""
         packet = Mock(spec=I3Packet)
         packet.packet_type = PacketType.FINGER_REQ
+        packet.originator_mud = "RemoteMUD"
+        packet.originator_user = "requester"
+        packet.target_mud = "TestMUD"
+        packet.target_user = ""
         packet.to_lpc_array.return_value = [
             "finger-req", 200, "RemoteMUD", "requester", "TestMUD", 0, 123  # Number
         ]
@@ -243,7 +254,7 @@ class TestFingerRequestHandling:
         assert result.username == "123"  # Should convert to string
     
     async def test_finger_request_user_info_fields(
-        self, finger_service, mock_state_manager, online_user_session
+        self, finger_service, mock_state_manager, online_user_session, sample_finger_request
     ):
         """Test that all user info fields are included correctly."""
         mock_state_manager.get_session.return_value = online_user_session
@@ -268,7 +279,7 @@ class TestFingerRequestHandling:
         assert user_info["extra"]["website"] == "http://test.example.com"
     
     async def test_finger_request_hide_ip_setting(
-        self, finger_service, mock_state_manager, online_user_session
+        self, finger_service, mock_state_manager, online_user_session, sample_finger_request
     ):
         """Test IP address hiding based on settings."""
         mock_state_manager.get_session.return_value = online_user_session
@@ -276,6 +287,9 @@ class TestFingerRequestHandling:
         # Test with IP hiding enabled (default)
         result = await finger_service.handle_packet(sample_finger_request)
         assert result.user_info["ip_address"] == ""  # Should be empty
+        
+        # Clear the cache before testing with different settings
+        finger_service.finger_cache.clear()
         
         # Test with IP hiding disabled
         finger_service.gateway.settings.services.finger["hide_ip"] = False
@@ -644,6 +658,10 @@ class TestEdgeCases:
         """Test handling packet with None username."""
         packet = Mock(spec=I3Packet)
         packet.packet_type = PacketType.FINGER_REQ
+        packet.originator_mud = "RemoteMUD"
+        packet.originator_user = "requester"
+        packet.target_mud = "TestMUD"
+        packet.target_user = ""
         packet.to_lpc_array.return_value = [
             "finger-req", 200, "RemoteMUD", "requester", "TestMUD", 0, None
         ]

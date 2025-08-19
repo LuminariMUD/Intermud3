@@ -32,7 +32,7 @@ from src.services.who import WhoService
 from src.services.finger import FingerService
 from src.services.locate import LocateService
 from src.state.manager import StateManager
-from src.gateway import Gateway
+from src.gateway import I3Gateway
 
 
 class PerformanceMetrics:

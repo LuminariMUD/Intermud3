@@ -72,7 +72,8 @@ class FingerService(BaseService):
             self.logger.warning("Invalid finger-req packet", data_len=len(data))
             return None
 
-        username = str(data[6]).lower() if data[6] else ""
+        original_username = str(data[6]) if data[6] else ""
+        username = original_username.lower()
 
         self.logger.info(
             "Received finger request",
@@ -87,7 +88,7 @@ class FingerService(BaseService):
             cached_data, cache_time = self.finger_cache[cache_key]
             if (datetime.now().timestamp() - cache_time) < self.cache_ttl:
                 self.logger.debug("Returning cached finger data", user=username)
-                return self._create_finger_reply(packet, username, cached_data)
+                return self._create_finger_reply(packet, original_username, cached_data)
 
         # Get user information from state manager
         user_info = await self._get_user_info(username)
@@ -97,7 +98,7 @@ class FingerService(BaseService):
             self.finger_cache[cache_key] = (user_info, datetime.now().timestamp())
 
         # Create and return finger reply
-        return self._create_finger_reply(packet, username, user_info)
+        return self._create_finger_reply(packet, original_username, user_info)
 
     async def _handle_finger_reply(self, packet: I3Packet) -> I3Packet | None:
         """Handle a finger reply packet.

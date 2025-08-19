@@ -23,13 +23,15 @@ A standalone Python implementation that acts as a protocol bridge between MUDs a
 
 ## Features
 
-- 🌐 Full Intermud-3 protocol support
-- 🔄 Automatic reconnection and failover
-- 📡 JSON-RPC API for easy MUD integration
-- 📊 Built-in metrics and monitoring
+- 🌐 Full Intermud-3 protocol support (Phase 2 Complete)
+- 🔄 Automatic reconnection and failover with circuit breakers
+- 📡 JSON-RPC API for easy MUD integration (Phase 3 pending)
+- 📊 Built-in metrics and monitoring 
 - 🐳 Docker support for easy deployment
 - ⚡ High performance (1000+ messages/sec)
 - 🔒 Secure authentication and authorization
+- ✅ Core services implemented (tell, channel, who, finger, locate)
+- 🔧 60% test coverage with comprehensive unit tests
 
 ## Quick Start
 

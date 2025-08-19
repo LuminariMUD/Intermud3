@@ -416,17 +416,21 @@ class TestPacketValidation:
     
     async def test_validate_locate_request_missing_username(self, locate_service):
         """Test validation rejects locate request without username."""
-        request = LocatePacket(
-            packet_type=PacketType.LOCATE_REQ,
-            ttl=200,
-            originator_mud="RemoteMUD",
-            originator_user="requester",
-            target_mud="TestMUD",
-            target_user="",
-            user_to_locate=""  # Empty username
-        )
+        from src.models.packet import PacketValidationError
         
-        assert await locate_service.validate_packet(request) is False
+        # Creating a LocatePacket with empty user_to_locate should raise validation error
+        with pytest.raises(PacketValidationError):
+            request = LocatePacket(
+                packet_type=PacketType.LOCATE_REQ,
+                ttl=200,
+                originator_mud="RemoteMUD",
+                originator_user="requester",
+                target_mud="TestMUD",
+                target_user="",
+                user_to_locate=""  # Empty username
+            )
+            # Force validation
+            request.validate()
 
 
 class TestLocateUserMethod:
@@ -619,7 +623,9 @@ class TestUtilityMethods:
     
     async def test_cleanup_pending(self, locate_service):
         """Test cleanup of old pending requests."""
-        old_time = datetime.now().replace(hour=0)  # Very old timestamp
+        from datetime import timedelta
+        
+        old_time = datetime.now() - timedelta(seconds=120)  # 2 minutes ago
         
         # Add some pending requests
         locate_service.pending_locates = {

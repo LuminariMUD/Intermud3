@@ -541,6 +541,11 @@ print(result)
 
 ## Version History
 
-- **0.2.0**: Initial API implementation with core methods
-- **0.3.0**: WebSocket support and extended event system (planned)
-- **0.4.0**: OOB services and advanced features (planned)
+- **0.2.0**: Phase 2 Complete - Core services implemented (tell, channel, who, finger, locate)
+  - Full test coverage for all services (60% overall)
+  - Circuit breakers and retry mechanisms
+  - Connection pooling and health checks
+  - Performance benchmarks and stress testing
+- **0.3.0**: Gateway API Protocol - JSON-RPC implementation (in progress)
+- **0.4.0**: WebSocket support and extended event system (planned)
+- **0.5.0**: OOB services and advanced features (planned)

@@ -126,9 +126,20 @@ class I3Packet(ABC):
 
 @dataclass
 class TellPacket(I3Packet):
-    """Private message packet."""
+    """Private message packet.
+    
+    IMPORTANT: According to official I3 protocol documentation:
+    - Tell packets MUST have a visname field (visual name of originator)
+    - The LPC array format is: [type, ttl, orig_mud, orig_user, target_mud, target_user, visname, message]
+    - This is IDENTICAL to the emoteto packet format
+    - visname is typically the sender's display name (can be different from username)
+    - If visname is not provided, it defaults to originator_user
+    """
 
     packet_type: PacketType = field(default=PacketType.TELL, init=False)
+    # CRITICAL: visname is REQUIRED by I3 protocol - Tell packets have 8 fields, NOT 7!
+    # See docs/intermud3_docs/VISNAME_CLARIFICATION.md for full details
+    visname: str = ""  # Position 6 in packet array - defaults to originator_user
     message: str = ""
 
     def validate(self) -> None:
@@ -143,9 +154,27 @@ class TellPacket(I3Packet):
 
         if not self.message:
             raise PacketValidationError("Tell requires a message")
+        
+        # CRITICAL: visname is REQUIRED - Tell packets MUST have 8 fields
+        # If not provided, it defaults to originator_user
+        # See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        if not self.visname:
+            self.visname = self.originator_user
 
     def to_lpc_array(self) -> list[Any]:
-        """Convert to LPC array."""
+        """Convert to LPC array.
+        
+        CRITICAL: Tell packets have EXACTLY 8 FIELDS - NOT 7!
+        Position 0: packet type ("tell")
+        Position 1: TTL
+        Position 2: originator mud name
+        Position 3: originator username
+        Position 4: target mud name
+        Position 5: target username (MUST be lowercased)
+        Position 6: visname (REQUIRED - defaults to originator_user)
+        Position 7: message content
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
         return [
             self.packet_type.value,
             self.ttl,
@@ -155,14 +184,20 @@ class TellPacket(I3Packet):
             (
                 self.target_user.lower() if self.target_user else 0
             ),  # Target username must be lowercased
+            self.visname if self.visname else 0,  # Position 6 - REQUIRED (8 fields total)
             self.message,
         ]
 
     @classmethod
     def from_lpc_array(cls, data: list[Any]) -> "TellPacket":
-        """Create from LPC array."""
-        if len(data) < 7:
-            raise PacketValidationError(f"Invalid tell packet: expected 7+ fields, got {len(data)}")
+        """Create from LPC array.
+        
+        CRITICAL: Tell packets have EXACTLY 8 FIELDS - NOT 7!
+        Position 6 is visname - REQUIRED by I3 protocol.
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
+        if len(data) < 8:
+            raise PacketValidationError(f"Invalid tell packet: expected 8+ fields, got {len(data)}")
 
         return cls(
             ttl=int(data[1]) if data[1] else 0,
@@ -170,16 +205,27 @@ class TellPacket(I3Packet):
             originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
             target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
             target_user=str(data[5]) if data[5] and data[5] != 0 else "",
-            message=str(data[6]) if data[6] else "",
+            visname=str(data[6]) if data[6] and data[6] != 0 else "",  # REQUIRED field
+            message=str(data[7]) if data[7] else "",
         )
 
 
 @dataclass
 class EmotetoPacket(I3Packet):
-    """Emote packet (similar to tell but for emotes)."""
+    """Emote packet (similar to tell but for emotes).
+    
+    CRITICAL: Emoteto packets have EXACTLY 8 FIELDS - same as tell packets!
+    - The LPC array format is: [type, ttl, orig_mud, orig_user, target_mud, target_user, visname, message]
+    - Position 6 is visname - REQUIRED field that defaults to originator_user
+    - The only difference from tell is the packet type and message display
+    - In emoteto, message contains $N tokens that get replaced with formatted sender name
+    See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+    """
 
     packet_type: PacketType = field(default=PacketType.EMOTETO, init=False)
-    visname: str = ""  # Visual name of originator
+    # CRITICAL: visname is REQUIRED - Emoteto packets have 8 fields, NOT 7!
+    # See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+    visname: str = ""  # Position 6 in packet array - defaults to originator_user
     message: str = ""
 
     def validate(self) -> None:
@@ -195,12 +241,19 @@ class EmotetoPacket(I3Packet):
         if not self.message:
             raise PacketValidationError("Emoteto requires a message")
 
-        # Visname defaults to originator_user if not specified
+        # CRITICAL: visname is REQUIRED - Emoteto packets MUST have 8 fields
+        # If not provided, it defaults to originator_user
+        # See docs/intermud3_docs/VISNAME_CLARIFICATION.md
         if not self.visname:
             self.visname = self.originator_user
 
     def to_lpc_array(self) -> list[Any]:
-        """Convert to LPC array."""
+        """Convert to LPC array.
+        
+        CRITICAL: Emoteto packets have EXACTLY 8 FIELDS - NOT 7!
+        Position 6 is visname - REQUIRED by I3 protocol.
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
         return [
             self.packet_type.value,
             self.ttl,
@@ -210,13 +263,18 @@ class EmotetoPacket(I3Packet):
             (
                 self.target_user.lower() if self.target_user else 0
             ),  # Target username must be lowercased
-            self.visname if self.visname else 0,
+            self.visname if self.visname else 0,  # Position 6 - REQUIRED (8 fields total)
             self.message,
         ]
 
     @classmethod
     def from_lpc_array(cls, data: list[Any]) -> "EmotetoPacket":
-        """Create from LPC array."""
+        """Create from LPC array.
+        
+        CRITICAL: Emoteto packets have EXACTLY 8 FIELDS - NOT 7!
+        Position 6 is visname - REQUIRED by I3 protocol.
+        See docs/intermud3_docs/VISNAME_CLARIFICATION.md
+        """
         if len(data) < 8:
             raise PacketValidationError(
                 f"Invalid emoteto packet: expected 8+ fields, got {len(data)}"
@@ -286,6 +344,16 @@ class LocatePacket(I3Packet):
         packet_type_str = str(data[0]) if data[0] else ""
         packet_type = PacketType(packet_type_str)
 
+        # Prepare extra fields based on packet type
+        extra_fields = {}
+        if packet_type == PacketType.LOCATE_REQ and len(data) > 6:
+            extra_fields["user_to_locate"] = str(data[6]) if data[6] else ""
+        elif packet_type == PacketType.LOCATE_REPLY and len(data) > 9:
+            extra_fields["located_mud"] = str(data[6]) if data[6] else ""
+            extra_fields["located_user"] = str(data[7]) if data[7] else ""
+            extra_fields["idle_time"] = int(data[8]) if data[8] else 0
+            extra_fields["status_string"] = str(data[9]) if data[9] else ""
+
         packet = cls(
             packet_type=packet_type,
             ttl=int(data[1]) if data[1] else 0,
@@ -293,15 +361,8 @@ class LocatePacket(I3Packet):
             originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
             target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
             target_user=str(data[5]) if data[5] and data[5] != 0 else "",
+            **extra_fields
         )
-
-        if packet_type == PacketType.LOCATE_REQ and len(data) > 6:
-            packet.user_to_locate = str(data[6]) if data[6] else ""
-        elif packet_type == PacketType.LOCATE_REPLY and len(data) > 9:
-            packet.located_mud = str(data[6]) if data[6] else ""
-            packet.located_user = str(data[7]) if data[7] else ""
-            packet.idle_time = int(data[8]) if data[8] else 0
-            packet.status_string = str(data[9]) if data[9] else ""
 
         return packet
 
@@ -500,8 +561,8 @@ class FingerPacket(I3Packet):
         super().validate()
 
         if self.packet_type == PacketType.FINGER_REQ:
-            if not self.username:
-                raise PacketValidationError("Finger request requires username")
+            # Empty username is allowed (for status checks or all-user queries)
+            pass
         elif self.packet_type == PacketType.FINGER_REPLY:
             if self.user_info is None:
                 raise PacketValidationError("Finger reply requires user_info")
@@ -598,6 +659,8 @@ class StartupPacket(I3Packet):
             self.target_mud,  # Router name
             0,  # target_user is always 0 for startup
             self.password,
+            self.old_mudlist_id,
+            self.old_chanlist_id,
             mud_port_value,
             tcp_port_value,
             udp_port_value,
@@ -608,15 +671,15 @@ class StartupPacket(I3Packet):
             self.open_status,
             self.admin_email,
             self.services,
-            self.other_data if self.other_data else {},  # Empty dict if no other data
+            self.other_data if self.other_data else 0,  # 0 if no other data
         ]
 
     @classmethod
     def from_lpc_array(cls, data: list[Any]) -> "StartupPacket":
         """Create from LPC array."""
-        if len(data) < 18:
+        if len(data) < 19:
             raise PacketValidationError(
-                f"Invalid startup packet: expected 18+ fields, got {len(data)}"
+                f"Invalid startup packet: expected 19+ fields, got {len(data)}"
             )
 
         return cls(
@@ -626,17 +689,19 @@ class StartupPacket(I3Packet):
             target_mud=str(data[4]) if data[4] else "",
             target_user=str(data[5]) if data[5] and data[5] != 0 else "",
             password=int(data[6]) if data[6] else 0,
-            mud_port=int(data[7]) if data[7] else 0,
-            tcp_port=int(data[8]) if data[8] else 0,
-            udp_port=int(data[9]) if data[9] else 0,
-            mudlib=str(data[10]) if data[10] else "",
-            base_mudlib=str(data[11]) if data[11] else "",
-            driver=str(data[12]) if data[12] else "",
-            mud_type=str(data[13]) if data[13] else "",
-            open_status=str(data[14]) if data[14] else "",
-            admin_email=str(data[15]) if data[15] else "",
-            services=data[16] if isinstance(data[16], dict) else {},
-            other_data=data[17] if len(data) > 17 and isinstance(data[17], dict) else {},
+            old_mudlist_id=int(data[7]) if data[7] else 0,
+            old_chanlist_id=int(data[8]) if data[8] else 0,
+            mud_port=int(data[9]) if data[9] else 0,
+            tcp_port=int(data[10]) if data[10] else 0,
+            udp_port=int(data[11]) if data[11] else 0,
+            mudlib=str(data[12]) if data[12] else "",
+            base_mudlib=str(data[13]) if data[13] else "",
+            driver=str(data[14]) if data[14] else "",
+            mud_type=str(data[15]) if data[15] else "",
+            open_status=str(data[16]) if data[16] else "",
+            admin_email=str(data[17]) if data[17] else "",
+            services=data[18] if isinstance(data[18], dict) else {},
+            other_data=data[19] if len(data) > 19 and isinstance(data[19], dict) else {},
         )
 
 

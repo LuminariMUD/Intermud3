@@ -25,7 +25,7 @@ class I3Gateway:
 
         # Initialize components
         self.state_manager = StateManager(
-            persistence_dir=Path("data") if settings.gateway.state_dir else None, cache_ttl=300.0
+            persistence_dir=Path("data"), cache_ttl=300.0
         )
 
         self.service_manager = ServiceManager(self.state_manager)
@@ -40,7 +40,7 @@ class I3Gateway:
         if settings.router.primary:
             routers.append(
                 RouterInfo(
-                    name=settings.router.primary.name or "*i3",
+                    name="*i3",
                     address=settings.router.primary.host,
                     port=settings.router.primary.port,
                     priority=0,
@@ -50,7 +50,7 @@ class I3Gateway:
         for i, fallback in enumerate(settings.router.fallback or []):
             routers.append(
                 RouterInfo(
-                    name=fallback.name or f"fallback-{i}",
+                    name=f"fallback-{i}",
                     address=fallback.host,
                     port=fallback.port,
                     priority=i + 1,

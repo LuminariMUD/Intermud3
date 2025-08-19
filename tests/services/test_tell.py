@@ -8,7 +8,7 @@ from typing import Optional
 from src.services.tell import TellService
 from src.models.packet import (
     TellPacket, EmotetoPacket, ErrorPacket, 
-    PacketType, I3Packet
+    PacketType, I3Packet, PacketValidationError
 )
 from src.state.manager import StateManager
 from src.models.connection import UserSession
@@ -264,55 +264,55 @@ class TestPacketValidation:
     
     async def test_validate_tell_missing_originator(self, tell_service):
         """Test validation rejects tell without originator user."""
-        packet = TellPacket(
-            ttl=200,
-            originator_mud="RemoteMUD",
-            originator_user="",  # Empty
-            target_mud="TestMUD",
-            target_user="receiver",
-            message="Hello"
-        )
-        
-        assert await tell_service.validate_packet(packet) is False
+        # Packet validation happens in __post_init__, so we expect an exception
+        with pytest.raises(PacketValidationError, match="Tell requires originator user"):
+            packet = TellPacket(
+                ttl=200,
+                originator_mud="RemoteMUD",
+                originator_user="",  # Empty
+                target_mud="TestMUD",
+                target_user="receiver",
+                message="Hello"
+            )
     
     async def test_validate_tell_missing_target(self, tell_service):
         """Test validation rejects tell without target user."""
-        packet = TellPacket(
-            ttl=200,
-            originator_mud="RemoteMUD",
-            originator_user="sender",
-            target_mud="TestMUD",
-            target_user="",  # Empty
-            message="Hello"
-        )
-        
-        assert await tell_service.validate_packet(packet) is False
+        # Packet validation happens in __post_init__, so we expect an exception
+        with pytest.raises(PacketValidationError, match="Tell requires target user"):
+            packet = TellPacket(
+                ttl=200,
+                originator_mud="RemoteMUD",
+                originator_user="sender",
+                target_mud="TestMUD",
+                target_user="",  # Empty
+                message="Hello"
+            )
     
     async def test_validate_tell_empty_message(self, tell_service):
         """Test validation rejects tell with empty message."""
-        packet = TellPacket(
-            ttl=200,
-            originator_mud="RemoteMUD",
-            originator_user="sender",
-            target_mud="TestMUD",
-            target_user="receiver",
-            message=""  # Empty
-        )
-        
-        assert await tell_service.validate_packet(packet) is False
+        # Packet validation happens in __post_init__, so we expect an exception
+        with pytest.raises(PacketValidationError, match="Tell requires a message"):
+            packet = TellPacket(
+                ttl=200,
+                originator_mud="RemoteMUD",
+                originator_user="sender",
+                target_mud="TestMUD",
+                target_user="receiver",
+                message=""  # Empty
+            )
     
     async def test_validate_emoteto_empty_message(self, tell_service):
         """Test validation rejects emoteto with empty message."""
-        packet = EmotetoPacket(
-            ttl=200,
-            originator_mud="RemoteMUD",
-            originator_user="sender",
-            target_mud="TestMUD",
-            target_user="receiver",
-            message=""  # Empty
-        )
-        
-        assert await tell_service.validate_packet(packet) is False
+        # Packet validation happens in __post_init__, so we expect an exception
+        with pytest.raises(PacketValidationError, match="Emoteto requires a message"):
+            packet = EmotetoPacket(
+                ttl=200,
+                originator_mud="RemoteMUD",
+                originator_user="sender",
+                target_mud="TestMUD",
+                target_user="receiver",
+                message=""  # Empty
+            )
     
     async def test_validate_wrong_packet_class(self, tell_service):
         """Test validation rejects wrong packet class."""
@@ -346,7 +346,7 @@ class TestSendingMessages:
         assert sent_packet.target_user == "bob"
         assert sent_packet.target_mud == "RemoteMUD"
         assert sent_packet.message == "Hello Bob!"
-        assert sent_packet.visname == "Alice"
+        assert sent_packet.visname == "alice"  # visname defaults to from_user when not provided
     
     async def test_send_tell_without_visname(self, tell_service, mock_gateway):
         """Test sending tell without visname uses username."""
