@@ -1,14 +1,12 @@
 """Configuration models for I3 Gateway."""
 
-from pathlib import Path
-from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ServiceConfig(BaseModel):
     """I3 service capabilities configuration."""
-    
+
     tell: int = 1
     emoteto: int = 1
     channel: int = 1
@@ -25,7 +23,7 @@ class ServiceConfig(BaseModel):
 
 class OOBServiceConfig(BaseModel):
     """Out-of-band service configuration."""
-    
+
     mail: int = 0
     news: int = 0
     file: int = 0
@@ -37,7 +35,7 @@ class OOBServiceConfig(BaseModel):
 
 class MudConfig(BaseModel):
     """MUD configuration."""
-    
+
     name: str
     port: int
     admin_email: str
@@ -52,7 +50,7 @@ class MudConfig(BaseModel):
 
 class RouterConnectionConfig(BaseModel):
     """Router connection settings."""
-    
+
     timeout: int = 300
     keepalive_interval: int = 60
     reconnect_delay: int = 30
@@ -61,7 +59,7 @@ class RouterConnectionConfig(BaseModel):
 
 class RouterHostConfig(BaseModel):
     """Router host configuration."""
-    
+
     host: str
     port: int = 8080
     password: int = 0
@@ -69,23 +67,23 @@ class RouterHostConfig(BaseModel):
 
 class RouterConfig(BaseModel):
     """Router configuration."""
-    
+
     primary: RouterHostConfig
-    fallback: List[RouterHostConfig] = Field(default_factory=list)
+    fallback: list[RouterHostConfig] = Field(default_factory=list)
     connection: RouterConnectionConfig = Field(default_factory=RouterConnectionConfig)
 
 
 class GatewayAuthConfig(BaseModel):
     """Gateway authentication configuration."""
-    
+
     enabled: bool = True
-    secret: Optional[str] = None
+    secret: str | None = None
     token_expiry: int = 3600
 
 
 class GatewayConfig(BaseModel):
     """Gateway server configuration."""
-    
+
     host: str = "localhost"
     port: int = 4001
     max_packet_size: int = 65536
@@ -100,7 +98,7 @@ class GatewayConfig(BaseModel):
 
 class LogComponentConfig(BaseModel):
     """Component-specific log levels."""
-    
+
     network: str = "INFO"
     services: str = "INFO"
     api: str = "INFO"
@@ -109,10 +107,10 @@ class LogComponentConfig(BaseModel):
 
 class LoggingConfig(BaseModel):
     """Logging configuration."""
-    
+
     level: str = "INFO"
     format: str = "json"
-    file: Optional[str] = None
+    file: str | None = None
     max_size: int = 10485760  # 10MB
     backup_count: int = 5
     components: LogComponentConfig = Field(default_factory=LogComponentConfig)
@@ -120,22 +118,22 @@ class LoggingConfig(BaseModel):
 
 class ChannelDefinition(BaseModel):
     """Channel definition."""
-    
+
     name: str
     type: int = 0  # 0 = public, 1 = private
 
 
 class ChannelConfig(BaseModel):
     """Channel configuration."""
-    
-    default_channels: List[ChannelDefinition] = Field(default_factory=list)
+
+    default_channels: list[ChannelDefinition] = Field(default_factory=list)
     history_size: int = 100
     max_message_length: int = 2048
 
 
 class StateConfig(BaseModel):
     """State management configuration."""
-    
+
     directory: str = "state/"
     save_interval: int = 300
     backup_enabled: bool = True
@@ -144,7 +142,7 @@ class StateConfig(BaseModel):
 
 class MetricsConfig(BaseModel):
     """Metrics configuration."""
-    
+
     enabled: bool = True
     port: int = 8080
     path: str = "/metrics"
@@ -152,7 +150,7 @@ class MetricsConfig(BaseModel):
 
 class DevelopmentConfig(BaseModel):
     """Development settings."""
-    
+
     debug: bool = False
     reload: bool = False
     profile: bool = False
@@ -160,7 +158,7 @@ class DevelopmentConfig(BaseModel):
 
 class Settings(BaseModel):
     """Main settings configuration."""
-    
+
     mud: MudConfig
     router: RouterConfig
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
@@ -169,7 +167,7 @@ class Settings(BaseModel):
     state: StateConfig = Field(default_factory=StateConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     development: DevelopmentConfig = Field(default_factory=DevelopmentConfig)
-    
+
     @field_validator("gateway")
     @classmethod
     def validate_gateway_auth(cls, v: GatewayConfig) -> GatewayConfig:
@@ -177,5 +175,5 @@ class Settings(BaseModel):
         if v.auth.enabled and not v.auth.secret:
             raise ValueError("Gateway auth is enabled but no secret provided")
         return v
-    
+
     model_config = ConfigDict(populate_by_name=True)

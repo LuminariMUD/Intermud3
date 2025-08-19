@@ -6,6 +6,7 @@ __description__ = "A standalone Python service for MUD-to-I3 network bridging"
 
 from typing import Final
 
+
 # Protocol version constants
 I3_PROTOCOL_VERSION: Final[int] = 3
 MUDMODE_VERSION: Final[int] = 1

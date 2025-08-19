@@ -46,7 +46,8 @@ def gateway_settings():
         gateway={
             "host": "127.0.0.1",
             "port": 8080,
-            "state_dir": None
+            "state_dir": None,
+            "auth": False
         },
         services=ServiceConfig(
             tell=1,

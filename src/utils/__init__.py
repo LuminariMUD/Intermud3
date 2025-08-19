@@ -1,8 +1,9 @@
 """Utility modules for I3 Gateway."""
 
-from .logging import setup_logging, get_logger
+from .logging import get_logger, setup_logging
+
 
 __all__ = [
-    "setup_logging",
     "get_logger",
+    "setup_logging",
 ]
