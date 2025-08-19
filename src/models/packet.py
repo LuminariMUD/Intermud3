@@ -125,6 +125,7 @@ class I3Packet(ABC):
 class TellPacket(I3Packet):
     """Private message packet."""
     packet_type: PacketType = field(default=PacketType.TELL, init=False)
+    visname: str = ""  # Visual name of originator
     message: str = ""
     
     def validate(self) -> None:
@@ -139,33 +140,168 @@ class TellPacket(I3Packet):
         
         if not self.message:
             raise PacketValidationError("Tell requires a message")
+        
+        # Visname defaults to originator_user if not specified
+        if not self.visname:
+            self.visname = self.originator_user
     
     def to_lpc_array(self) -> List[Any]:
         """Convert to LPC array."""
         return [
             self.packet_type.value,
             self.ttl,
-            self.originator_mud,
-            self.originator_user,
-            self.target_mud,
-            self.target_user,
+            self.originator_mud if self.originator_mud else 0,
+            self.originator_user if self.originator_user else 0,
+            self.target_mud if self.target_mud else 0,
+            self.target_user.lower() if self.target_user else 0,  # Target username must be lowercased
+            self.visname if self.visname else 0,
             self.message
         ]
     
     @classmethod
     def from_lpc_array(cls, data: List[Any]) -> 'TellPacket':
         """Create from LPC array."""
-        if len(data) < 7:
-            raise PacketValidationError(f"Invalid tell packet: expected 7+ fields, got {len(data)}")
+        if len(data) < 8:
+            raise PacketValidationError(f"Invalid tell packet: expected 8+ fields, got {len(data)}")
         
         return cls(
             ttl=int(data[1]) if data[1] else 0,
-            originator_mud=str(data[2]) if data[2] else "",
-            originator_user=str(data[3]) if data[3] else "",
-            target_mud=str(data[4]) if data[4] else "",
-            target_user=str(data[5]) if data[5] else "",
-            message=str(data[6]) if data[6] else ""
+            originator_mud=str(data[2]) if data[2] and data[2] != 0 else "",
+            originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
+            target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
+            target_user=str(data[5]) if data[5] and data[5] != 0 else "",
+            visname=str(data[6]) if data[6] and data[6] != 0 else "",
+            message=str(data[7]) if data[7] else ""
         )
+
+
+@dataclass
+class EmotetoPacket(I3Packet):
+    """Emote packet (similar to tell but for emotes)."""
+    packet_type: PacketType = field(default=PacketType.EMOTETO, init=False)
+    visname: str = ""  # Visual name of originator
+    message: str = ""
+    
+    def validate(self) -> None:
+        """Validate emoteto packet."""
+        super().validate()
+        
+        if not self.originator_user:
+            raise PacketValidationError("Emoteto requires originator user")
+        
+        if not self.target_user:
+            raise PacketValidationError("Emoteto requires target user")
+        
+        if not self.message:
+            raise PacketValidationError("Emoteto requires a message")
+        
+        # Visname defaults to originator_user if not specified
+        if not self.visname:
+            self.visname = self.originator_user
+    
+    def to_lpc_array(self) -> List[Any]:
+        """Convert to LPC array."""
+        return [
+            self.packet_type.value,
+            self.ttl,
+            self.originator_mud if self.originator_mud else 0,
+            self.originator_user if self.originator_user else 0,
+            self.target_mud if self.target_mud else 0,
+            self.target_user.lower() if self.target_user else 0,  # Target username must be lowercased
+            self.visname if self.visname else 0,
+            self.message
+        ]
+    
+    @classmethod
+    def from_lpc_array(cls, data: List[Any]) -> 'EmotetoPacket':
+        """Create from LPC array."""
+        if len(data) < 8:
+            raise PacketValidationError(f"Invalid emoteto packet: expected 8+ fields, got {len(data)}")
+        
+        return cls(
+            ttl=int(data[1]) if data[1] else 0,
+            originator_mud=str(data[2]) if data[2] and data[2] != 0 else "",
+            originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
+            target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
+            target_user=str(data[5]) if data[5] and data[5] != 0 else "",
+            visname=str(data[6]) if data[6] and data[6] != 0 else "",
+            message=str(data[7]) if data[7] else ""
+        )
+
+
+@dataclass
+class LocatePacket(I3Packet):
+    """Locate request/reply packet."""
+    # For locate-req
+    user_to_locate: str = ""
+    
+    # For locate-reply
+    located_mud: str = ""
+    located_user: str = ""
+    idle_time: int = 0
+    status_string: str = ""
+    
+    def validate(self) -> None:
+        """Validate locate packet."""
+        super().validate()
+        
+        if self.packet_type == PacketType.LOCATE_REQ:
+            if not self.user_to_locate:
+                raise PacketValidationError("Locate request requires user to locate")
+        elif self.packet_type == PacketType.LOCATE_REPLY:
+            # locate-reply can be empty if user not found
+            pass
+    
+    def to_lpc_array(self) -> List[Any]:
+        """Convert to LPC array."""
+        base = [
+            self.packet_type.value,
+            self.ttl,
+            self.originator_mud,
+            self.originator_user,
+            self.target_mud if self.target_mud else 0,  # 0 for broadcast
+            self.target_user if self.target_user else 0,
+        ]
+        
+        if self.packet_type == PacketType.LOCATE_REQ:
+            base.append(self.user_to_locate)
+        else:  # LOCATE_REPLY
+            base.extend([
+                self.located_mud,
+                self.located_user,
+                self.idle_time,
+                self.status_string
+            ])
+        
+        return base
+    
+    @classmethod
+    def from_lpc_array(cls, data: List[Any]) -> 'LocatePacket':
+        """Create from LPC array."""
+        if len(data) < 7:
+            raise PacketValidationError(f"Invalid locate packet: expected 7+ fields, got {len(data)}")
+        
+        packet_type_str = str(data[0]) if data[0] else ""
+        packet_type = PacketType(packet_type_str)
+        
+        packet = cls(
+            packet_type=packet_type,
+            ttl=int(data[1]) if data[1] else 0,
+            originator_mud=str(data[2]) if data[2] and data[2] != 0 else "",
+            originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
+            target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
+            target_user=str(data[5]) if data[5] and data[5] != 0 else "",
+        )
+        
+        if packet_type == PacketType.LOCATE_REQ and len(data) > 6:
+            packet.user_to_locate = str(data[6]) if data[6] else ""
+        elif packet_type == PacketType.LOCATE_REPLY and len(data) > 9:
+            packet.located_mud = str(data[6]) if data[6] else ""
+            packet.located_user = str(data[7]) if data[7] else ""
+            packet.idle_time = int(data[8]) if data[8] else 0
+            packet.status_string = str(data[9]) if data[9] else ""
+        
+        return packet
 
 
 @dataclass
@@ -356,14 +492,16 @@ class StartupPacket(I3Packet):
     packet_type: PacketType = field(default=PacketType.STARTUP_REQ_3, init=False)
     
     password: int = 0
-    mud_port: int = 0
-    tcp_port: int = 0
-    udp_port: int = 0
+    old_mudlist_id: int = 0  # Current mudlist version
+    old_chanlist_id: int = 0  # Current channel list version
+    player_port: int = 0  # Player connection port
+    imud_tcp_port: int = 0  # OOB TCP port
+    imud_udp_port: int = 0  # OOB UDP port
     mudlib: str = ""
     base_mudlib: str = ""
     driver: str = ""
-    mud_type: str = ""
-    open_status: str = ""
+    mud_type: str = ""  # LP, MOO, Diku, etc.
+    open_status: str = ""  # mudlib development, beta testing, open for public, restricted access
     admin_email: str = ""
     services: Dict[str, int] = field(default_factory=dict)
     other_data: Dict[str, Any] = field(default_factory=dict)
@@ -381,13 +519,15 @@ class StartupPacket(I3Packet):
             self.packet_type.value,
             self.ttl,
             self.originator_mud,
-            self.originator_user,
-            self.target_mud,
-            self.target_user,
+            0,  # originator_user is always 0 for startup
+            self.target_mud,  # Router name
+            0,  # target_user is always 0 for startup
             self.password,
-            self.mud_port,
-            self.tcp_port,
-            self.udp_port,
+            self.old_mudlist_id,
+            self.old_chanlist_id,
+            self.player_port,
+            self.imud_tcp_port,
+            self.imud_udp_port,
             self.mudlib,
             self.base_mudlib,
             self.driver,
@@ -395,33 +535,77 @@ class StartupPacket(I3Packet):
             self.open_status,
             self.admin_email,
             self.services,
-            self.other_data
+            self.other_data if self.other_data else 0  # Can be 0 if no other data
         ]
     
     @classmethod
     def from_lpc_array(cls, data: List[Any]) -> 'StartupPacket':
         """Create from LPC array."""
-        if len(data) < 18:
-            raise PacketValidationError(f"Invalid startup packet: expected 18+ fields, got {len(data)}")
+        if len(data) < 20:
+            raise PacketValidationError(f"Invalid startup packet: expected 20+ fields, got {len(data)}")
         
         return cls(
             ttl=int(data[1]) if data[1] else 0,
             originator_mud=str(data[2]) if data[2] else "",
-            originator_user=str(data[3]) if data[3] else "",
+            originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
             target_mud=str(data[4]) if data[4] else "",
-            target_user=str(data[5]) if data[5] else "",
+            target_user=str(data[5]) if data[5] and data[5] != 0 else "",
             password=int(data[6]) if data[6] else 0,
-            mud_port=int(data[7]) if data[7] else 0,
-            tcp_port=int(data[8]) if data[8] else 0,
-            udp_port=int(data[9]) if data[9] else 0,
-            mudlib=str(data[10]) if data[10] else "",
-            base_mudlib=str(data[11]) if data[11] else "",
-            driver=str(data[12]) if data[12] else "",
-            mud_type=str(data[13]) if data[13] else "",
-            open_status=str(data[14]) if data[14] else "",
-            admin_email=str(data[15]) if data[15] else "",
-            services=data[16] if isinstance(data[16], dict) else {},
-            other_data=data[17] if isinstance(data[17], dict) else {}
+            old_mudlist_id=int(data[7]) if data[7] else 0,
+            old_chanlist_id=int(data[8]) if data[8] else 0,
+            player_port=int(data[9]) if data[9] else 0,
+            imud_tcp_port=int(data[10]) if data[10] else 0,
+            imud_udp_port=int(data[11]) if data[11] else 0,
+            mudlib=str(data[12]) if data[12] else "",
+            base_mudlib=str(data[13]) if data[13] else "",
+            driver=str(data[14]) if data[14] else "",
+            mud_type=str(data[15]) if data[15] else "",
+            open_status=str(data[16]) if data[16] else "",
+            admin_email=str(data[17]) if data[17] else "",
+            services=data[18] if isinstance(data[18], dict) else {},
+            other_data=data[19] if data[19] and isinstance(data[19], dict) else {}
+        )
+
+
+@dataclass
+class StartupReplyPacket(I3Packet):
+    """Startup reply packet from router."""
+    packet_type: PacketType = field(default=PacketType.STARTUP_REPLY, init=False)
+    
+    router_list: List[List[str]] = field(default_factory=list)
+    password: int = 0
+    
+    def validate(self) -> None:
+        """Validate startup reply packet."""
+        super().validate()
+    
+    def to_lpc_array(self) -> List[Any]:
+        """Convert to LPC array."""
+        return [
+            self.packet_type.value,
+            self.ttl,
+            self.originator_mud,  # Router name
+            0,
+            self.target_mud,
+            0,
+            self.router_list,
+            self.password
+        ]
+    
+    @classmethod
+    def from_lpc_array(cls, data: List[Any]) -> 'StartupReplyPacket':
+        """Create from LPC array."""
+        if len(data) < 8:
+            raise PacketValidationError(f"Invalid startup reply packet: expected 8+ fields, got {len(data)}")
+        
+        return cls(
+            ttl=int(data[1]) if data[1] else 0,
+            originator_mud=str(data[2]) if data[2] and data[2] != 0 else "",
+            originator_user="",
+            target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
+            target_user="",
+            router_list=data[6] if isinstance(data[6], list) else [],
+            password=int(data[7]) if data[7] else 0
         )
 
 
@@ -521,7 +705,7 @@ class PacketFactory:
     # Map packet type strings to packet classes
     _packet_classes: Dict[str, Type[I3Packet]] = {
         PacketType.TELL.value: TellPacket,
-        PacketType.EMOTETO.value: TellPacket,  # Similar structure
+        PacketType.EMOTETO.value: EmotetoPacket,
         PacketType.CHANNEL_M.value: ChannelPacket,
         PacketType.CHANNEL_E.value: ChannelPacket,
         PacketType.CHANNEL_T.value: ChannelPacket,
@@ -529,7 +713,10 @@ class PacketFactory:
         PacketType.WHO_REPLY.value: WhoPacket,
         PacketType.FINGER_REQ.value: FingerPacket,
         PacketType.FINGER_REPLY.value: FingerPacket,
+        PacketType.LOCATE_REQ.value: LocatePacket,
+        PacketType.LOCATE_REPLY.value: LocatePacket,
         PacketType.STARTUP_REQ_3.value: StartupPacket,
+        PacketType.STARTUP_REPLY.value: StartupReplyPacket,
         PacketType.MUDLIST.value: MudlistPacket,
         PacketType.ERROR.value: ErrorPacket,
     }
