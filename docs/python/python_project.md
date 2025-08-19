@@ -1,11 +1,73 @@
-Here's a comprehensive guide to everything you need for a professional Python project:
+# Intermud3 Gateway - Python Project Structure
 
-## Essential Python Project Infrastructure
+## Project Overview
 
-### 1. **Project Management & Dependencies**
+The Intermud3 Gateway is a standalone Python service that bridges MUDs to the global Intermud-3 network, handling protocol complexity while exposing a simple JSON-RPC API.
+
+## Current Project Structure
+
+```
+Intermud3/
+├── .github/                    # GitHub configuration
+│   └── ci.yml                  # CI/CD workflow
+├── .vscode/                    # VS Code settings
+│   └── settings.json
+├── config/                     # Gateway configuration
+│   └── config.yaml
+├── docs/                       # Documentation
+│   ├── intermud3_docs/         # I3 protocol documentation
+│   ├── previous_changelogs/    # Historical changes
+│   ├── python/                 # Python project docs
+│   ├── CHANGELOG.md
+│   ├── HIGH_LEVEL_PLAN.md
+│   └── TODO.md
+├── src/                        # Source code
+│   ├── __init__.py
+│   ├── __main__.py             # Entry point
+│   ├── gateway.py              # Main gateway class
+│   ├── config/                 # Configuration module
+│   │   ├── __init__.py
+│   │   ├── loader.py
+│   │   └── models.py
+│   ├── models/                 # Data models
+│   │   └── __init__.py
+│   ├── network/                # Network layer
+│   │   └── __init__.py
+│   ├── services/               # I3 services
+│   │   └── __init__.py
+│   ├── state/                  # State management
+│   │   └── __init__.py
+│   ├── utils/                  # Utilities
+│   │   ├── __init__.py
+│   │   └── logging.py
+│   └── py.typed                # Type checking marker
+├── tests/                      # Test suite
+│   ├── __init__.py
+│   ├── conftest.py             # Pytest fixtures
+│   ├── fixtures/               # Test data
+│   ├── integration/            # Integration tests
+│   └── unit/                   # Unit tests
+├── .env.example                # Environment template
+├── .gitignore                  # Git ignore rules
+├── .pre-commit-config.yaml     # Pre-commit hooks
+├── CLAUDE.md                   # Claude Code instructions
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── Dockerfile                  # Container definition
+├── docker-compose.yml          # Multi-container setup
+├── LICENSE.md
+├── Makefile                    # Build automation
+├── pyproject.toml              # Project configuration
+├── README.md
+├── requirements.txt            # Production dependencies
+└── requirements-dev.txt        # Development dependencies
+```
+
+## Active Configuration
+
+### 1. **Project Definition (pyproject.toml)**
 
 ```toml
-# pyproject.toml (Modern Python project config)
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -13,13 +75,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "i3-gateway"
 version = "0.1.0"
-description = "Intermud3 Protocol Gateway"
+description = "Intermud3 Protocol Gateway - A standalone Python service for MUD-to-I3 network bridging"
 readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "MIT"}
+
 dependencies = [
-    "asyncio",
     "pyyaml>=6.0",
     "structlog>=23.0",
+    "aiohttp>=3.9.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0.0",
+    "click>=8.0",
 ]
 
 [project.optional-dependencies]
@@ -27,59 +94,77 @@ dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
     "pytest-cov>=4.0",
+    "pytest-mock>=3.11",
     "black>=23.0",
     "ruff>=0.1.0",
     "mypy>=1.5",
     "pre-commit>=3.3",
+    "types-pyyaml>=6.0",
 ]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=1.3",
+    "autodoc>=0.5",
+]
+security = [
+    "bandit>=1.7",
+    "safety>=2.3",
+    "pip-audit>=2.6",
+]
+
+[project.scripts]
+i3-gateway = "src.__main__:main"
 ```
 
-**Poetry Alternative** (Many prefer this):
-```bash
-poetry init
-poetry add pyyaml structlog
-poetry add --group dev pytest black ruff mypy
-```
+### 2. **Code Quality Configuration**
 
-### 2. **Code Quality Tools**
-
-#### **Linting - Ruff (Fast, replaces Flake8/Pylint)**
+#### **Ruff - Fast Python Linter**
 ```toml
-# ruff.toml or pyproject.toml
 [tool.ruff]
 line-length = 100
 target-version = "py39"
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "ARG", # flake8-unused-arguments
-    "SIM", # flake8-simplify
+    "E", "W",      # pycodestyle
+    "F",           # pyflakes
+    "I",           # isort
+    "B",           # flake8-bugbear
+    "C4",          # flake8-comprehensions
+    "UP",          # pyupgrade
+    "ARG",         # flake8-unused-arguments
+    "SIM",         # flake8-simplify
+    "PTH",         # flake8-use-pathlib
+    "ERA",         # flake8-eradicate
+    "RUF",         # Ruff-specific rules
 ]
-ignore = ["E501", "B008"]  # Line length, function calls in defaults
+ignore = [
+    "E501",        # Line too long (handled by black)
+    "B008",        # Function calls in argument defaults
+    "B904",        # raise without from inside except
+    "SIM108",      # Use ternary operator
+]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]  # Allow assert in tests
+"tests/*" = ["S101", "ARG001", "ARG002"]
+"**/__init__.py" = ["F401"]
 ```
 
-#### **Code Formatting - Black**
+#### **Black - Code Formatter**
 ```toml
-# pyproject.toml
 [tool.black]
 line-length = 100
-target-version = ['py39']
+target-version = ['py39', 'py310', 'py311']
 include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs | \.git | \.mypy_cache | \.venv | build | dist
+)/
+'''
 ```
 
-#### **Type Checking - MyPy**
+#### **MyPy - Type Checker**
 ```toml
-# pyproject.toml
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
@@ -90,46 +175,51 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+show_error_codes = true
+pretty = true
 ```
 
-### 3. **Testing Framework**
+### 3. **Testing Configuration**
 
-#### **Pytest + Coverage**
-```ini
-# pytest.ini
-[tool:pytest]
-testpaths = tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-addopts =
-    --verbose
-    --cov=src
-    --cov-report=term-missing
-    --cov-report=html
-    --cov-fail-under=80
-asyncio_mode = auto
+#### **Pytest Settings**
+```toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=80",
+    "--strict-markers",
+    "--tb=short",
+]
+asyncio_mode = "auto"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests",
+    "network: Tests requiring network access",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/__init__.py", "*/conftest.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
 ```
 
-```python
-# tests/conftest.py (Pytest fixtures)
-import pytest
-import asyncio
-
-@pytest.fixture
-def event_loop():
-    """Create event loop for async tests"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-@pytest.fixture
-async def mock_i3_server():
-    """Mock I3 server for testing"""
-    # Your mock implementation
-```
-
-### 4. **Pre-commit Hooks**
+### 4. **Pre-commit Hooks (Active)**
 
 ```yaml
 # .pre-commit-config.yaml
@@ -161,346 +251,216 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-all]
+        additional_dependencies: [types-pyyaml]
 ```
 
-Install with:
-```bash
-pre-commit install
-pre-commit run --all-files  # Run on all files
-```
+### 5. **Makefile Commands (Active)**
 
-### 5. **Documentation Tools**
-
-#### **Docstrings - Google Style**
-```python
-def send_packet(self, packet: I3Packet, timeout: float = 30.0) -> bool:
-    """Send an I3 packet to the router.
-
-    Args:
-        packet: The I3 packet to send
-        timeout: Maximum time to wait for send completion
-
-    Returns:
-        True if packet was sent successfully
-
-    Raises:
-        ConnectionError: If not connected to router
-        TimeoutError: If send times out
-
-    Example:
-        >>> gateway.send_packet(tell_packet, timeout=10.0)
-        True
-    """
-```
-
-#### **Sphinx Documentation**
-```bash
-pip install sphinx sphinx-rtd-theme autodoc
-sphinx-quickstart docs/
-```
-
-### 6. **Logging & Debugging**
-
-```python
-# src/utils/logging.py
-import logging
-import structlog
-
-def setup_logging(level: str = "INFO", json: bool = False):
-    """Configure structured logging"""
-
-    processors = [
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.dev.set_exc_info,
-    ]
-
-    if json:
-        processors.append(structlog.processors.JSONRenderer())
-    else:
-        processors.append(structlog.dev.ConsoleRenderer())
-
-    structlog.configure(
-        processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, level)
-        ),
-    )
-```
-
-### 7. **Environment Management**
-
-```ini
-# .env (for local development)
-I3_ROUTER_HOST=204.209.44.3
-I3_ROUTER_PORT=8080
-LOG_LEVEL=DEBUG
-GATEWAY_PORT=4000
-```
-
-```python
-# src/config.py
-from pydantic import BaseSettings
-
-class Settings(BaseSettings):
-    """Application settings with validation"""
-
-    i3_router_host: str
-    i3_router_port: int = 8080
-    log_level: str = "INFO"
-
-    class Config:
-        env_file = ".env"
-```
-
-### 8. **CI/CD - GitHub Actions**
-
-```yaml
-# .github/workflows/ci.yml
-name: CI
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        pip install -e ".[dev]"
-
-    - name: Lint with ruff
-      run: ruff check .
-
-    - name: Format with black
-      run: black --check .
-
-    - name: Type check with mypy
-      run: mypy src/
-
-    - name: Test with pytest
-      run: pytest --cov=src --cov-report=xml
-
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-```
-
-### 9. **Security Tools**
-
-```bash
-# Security scanning
-pip install bandit safety pip-audit
-
-# Run security checks
-bandit -r src/
-safety check
-pip-audit
-```
-
-### 10. **Performance Profiling**
-
-```python
-# Profile async code
-import cProfile
-import pstats
-from line_profiler import LineProfiler
-
-# Memory profiling
-from memory_profiler import profile
-
-@profile
-def memory_intensive_function():
-    # Your code
-```
-
-### 11. **Project Structure**
-
-```
-i3-gateway/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── docs/
-│   ├── conf.py
-│   └── index.rst
-├── src/
-│   └── i3_gateway/
-│       ├── __init__.py
-│       ├── __main__.py      # Entry point
-│       ├── network/
-│       ├── services/
-│       └── utils/
-├── tests/
-│   ├── conftest.py
-│   ├── unit/
-│   └── integration/
-├── .env.example
-├── .gitignore
-├── .pre-commit-config.yaml
-├── docker-compose.yml
-├── Dockerfile
-├── Makefile
-├── pyproject.toml
-├── README.md
-└── requirements.txt         # Generated from pyproject.toml
-```
-
-### 12. **Makefile for Common Tasks**
+The project includes a comprehensive Makefile with these commands:
 
 ```makefile
-# Makefile
-.PHONY: help install test lint format clean
-
-help:
-	@echo "Available commands:"
-	@echo "  install    Install dependencies"
-	@echo "  test       Run tests"
-	@echo "  lint       Run linting"
-	@echo "  format     Format code"
-	@echo "  clean      Clean up files"
-
-install:
-	pip install -e ".[dev]"
-	pre-commit install
-
-test:
-	pytest
-
-lint:
-	ruff check .
-	mypy src/
-
-format:
-	black .
-	ruff check --fix .
-
-clean:
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
-	rm -rf .pytest_cache .coverage htmlcov dist build *.egg-info
+make help            # Show all available commands
+make install         # Install production dependencies
+make install-dev     # Install development dependencies
+make test            # Run all tests
+make test-unit       # Run unit tests only
+make test-integration # Run integration tests only
+make test-coverage   # Run tests with coverage report
+make lint            # Run linting checks
+make format          # Format code with Black and Ruff
+make type-check      # Run type checking with MyPy
+make clean           # Clean up generated files
+make run             # Run the I3 Gateway
+make dev             # Run in development mode with auto-reload
+make docker-build    # Build Docker image
+make docker-run      # Run Docker container
+make pre-commit      # Run pre-commit hooks on all files
+make security        # Run security checks
+make check           # Run all checks (lint, type-check, test)
+make setup           # Complete development setup
 ```
 
-### 13. **Docker Setup**
+### 6. **Docker Configuration**
 
 ```dockerfile
-# Dockerfile
-FROM python:3.9-slim
+# Dockerfile (Active)
+FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml .
-RUN pip install -e .
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY src/ src/
+COPY config/ config/
 
-CMD ["python", "-m", "i3_gateway"]
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
+
+# Run the gateway
+CMD ["python", "-m", "src"]
 ```
 
-### 14. **VS Code Configuration**
+```yaml
+# docker-compose.yml (Active)
+version: '3.8'
+
+services:
+  i3-gateway:
+    build: .
+    container_name: i3-gateway
+    ports:
+      - "4001:4001"
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=INFO
+      - I3_ROUTER_HOST=204.209.44.3
+      - I3_ROUTER_PORT=8080
+    restart: unless-stopped
+```
+
+### 7. **VS Code Settings**
 
 ```json
-// .vscode/settings.json
+// .vscode/settings.json (Active)
 {
+    "python.defaultInterpreter": "venv/bin/python",
     "python.linting.enabled": true,
     "python.linting.ruffEnabled": true,
     "python.formatting.provider": "black",
     "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": ["tests"],
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": true
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
     }
 }
 ```
 
-### 15. **Essential .gitignore**
+### 8. **Environment Configuration**
 
-```gitignore
-# .gitignore
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv
-.env
-.pytest_cache/
-.coverage
-htmlcov/
-dist/
-build/
-*.egg-info/
-.mypy_cache/
-.ruff_cache/
-.DS_Store
-*.log
+```ini
+# .env.example (Template for local development)
+# I3 Router Settings
+I3_ROUTER_HOST=204.209.44.3
+I3_ROUTER_PORT=8080
+I3_ROUTER_PASSWORD=your_password_here
+
+# Gateway Settings
+GATEWAY_HOST=0.0.0.0
+GATEWAY_PORT=4001
+
+# MUD Settings
+MUD_NAME=YourMUD
+MUD_PORT=4000
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+
+# Security
+GATEWAY_SECRET=your_secret_key
 ```
 
-## Quick Setup Commands
+## Development Workflow
 
+### Initial Setup
 ```bash
-# Create project
-mkdir i3-gateway && cd i3-gateway
-python -m venv venv
+# Clone repository
+git clone <repository-url>
+cd Intermud3
+
+# Create virtual environment
+python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Initialize project
-pip install --upgrade pip
-pip install poetry  # or use pip with pyproject.toml
+# Install dependencies
+make install-dev
 
-# Install everything
-poetry install  # or pip install -e ".[dev]"
+# Copy environment template
+cp .env.example .env
+# Edit .env with your settings
 
-# Set up pre-commit
-pre-commit install
-
-# Run all checks
-make lint
+# Run tests to verify setup
 make test
-make format
-
-# Start development
-python -m i3_gateway
 ```
 
-## Priority Order for Implementation
+### Daily Development
+```bash
+# Activate virtual environment
+source venv/bin/activate
 
-1. **First (Essential)**
-   - Virtual environment
-   - pyproject.toml / requirements.txt
-   - Basic project structure
-   - Git + .gitignore
+# Run linting and formatting
+make format
+make lint
 
-2. **Second (Quality)**
-   - Pytest for testing
-   - Black for formatting
-   - Ruff for linting
-   - Pre-commit hooks
+# Run tests
+make test-unit       # Quick unit tests
+make test-coverage   # Full test suite with coverage
 
-3. **Third (Professional)**
-   - MyPy for type checking
-   - Coverage reporting
-   - CI/CD with GitHub Actions
-   - Logging with structlog
+# Run the gateway
+make dev            # Development mode with debug logging
+```
 
-4. **Fourth (Polish)**
-   - Documentation with Sphinx
-   - Docker setup
-   - Makefile
-   - Security scanning
+### Before Committing
+```bash
+# Run all checks
+make check
 
-This comprehensive setup ensures your Python project follows industry best practices and is ready for production deployment!
+# Or manually run pre-commit
+pre-commit run --all-files
+```
+
+## Project Status
+
+Currently in **Phase 1-2** of development (see docs/HIGH_LEVEL_PLAN.md):
+- ✅ Project structure and configuration
+- ✅ Development environment setup
+- 🚧 Core network protocol implementation
+- 🚧 Basic service handlers
+- ⏳ JSON-RPC API implementation
+- ⏳ Advanced features and OOB services
+
+## Key Dependencies
+
+### Production
+- **aiohttp**: Async HTTP client/server framework
+- **pydantic**: Data validation using Python type annotations
+- **pyyaml**: YAML configuration parsing
+- **structlog**: Structured logging
+- **click**: Command-line interface creation
+- **python-dotenv**: Load environment variables from .env
+
+### Development
+- **pytest**: Testing framework
+- **pytest-asyncio**: Async test support
+- **pytest-cov**: Coverage reporting
+- **black**: Code formatter
+- **ruff**: Fast Python linter
+- **mypy**: Static type checker
+- **pre-commit**: Git hook framework
+
+## Contributing
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines on:
+- Code style and formatting
+- Testing requirements
+- Pull request process
+- Issue reporting
+
+## License
+
+MIT License - see [LICENSE.md](../LICENSE.md) for details

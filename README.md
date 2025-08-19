@@ -1,6 +1,25 @@
-# I3 Gateway - Intermud3 Protocol Gateway Service
+# Intermud3 Gateway Service
 
-A standalone Python implementation that acts as a protocol bridge between MUDs and the global Intermud-3 network.
+A standalone Python implementation that acts as a protocol bridge between MUDs and the global Intermud-3 network. This gateway handles all I3 protocol complexity internally while exposing a simple JSON-RPC API for easy MUD integration.
+
+## 📚 Documentation
+
+### Essential Documentation
+- **[High-Level Implementation Plan](docs/HIGH_LEVEL_PLAN.md)** - Complete architectural overview and implementation roadmap
+- **[Python Project Setup Guide](docs/python/python_project.md)** - Detailed Python development environment setup and configuration
+- **[Intermud3 Protocol Documentation](docs/intermud3_docs/)** - Comprehensive I3 protocol specifications:
+  - [Protocol Overview](docs/intermud3_docs/overview.md) - Introduction to Intermud3
+  - [Architecture](docs/intermud3_docs/architecture.md) - System architecture details
+  - [Packet Format](docs/intermud3_docs/packet-format.md) - LPC packet structure
+  - [Services Documentation](docs/intermud3_docs/services/) - Individual service specifications (tell, channel, who, etc.)
+  - [Router Design](docs/intermud3_docs/router-design.md) - Router implementation details
+- **[TODO List](docs/TODO.md)** - Current development tasks and roadmap
+- **[Changelog](docs/CHANGELOG.md)** - Version history and changes
+
+### Developer Resources
+- **[CLAUDE.md](CLAUDE.md)** - Claude Code AI assistant instructions
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community guidelines
 
 ## Features
 
@@ -23,8 +42,8 @@ A standalone Python implementation that acts as a protocol bridge between MUDs a
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/i3-gateway.git
-cd i3-gateway
+git clone https://github.com/yourusername/intermud3-gateway.git
+cd intermud3-gateway
 ```
 
 2. Create and activate virtual environment:
@@ -35,22 +54,26 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 3. Install dependencies:
 ```bash
-make install-dev  # For development
-# OR
-pip install -e .  # For production
+pip install -r requirements.txt       # Core dependencies
+pip install -r requirements-dev.txt   # Development dependencies
+# OR use Makefile
+make install-dev
 ```
 
 4. Copy and configure environment:
 ```bash
 cp .env.example .env
 # Edit .env with your MUD settings
+# Key settings: MUD_NAME, MUD_PORT, GATEWAY_PORT
 ```
 
 5. Run the gateway:
 ```bash
-make run
+python -m src -c config/config.yaml
 # OR
-python -m i3_gateway
+python src/__main__.py -c config/config.yaml
+# OR with debug logging
+LOG_LEVEL=DEBUG python -m src -c config/config.yaml
 ```
 
 ## Development
@@ -138,16 +161,30 @@ The gateway exposes a JSON-RPC API on port 4001 by default.
 ## Project Structure
 
 ```
-i3-gateway/
-├── src/i3_gateway/
-│   ├── network/      # MudMode protocol implementation
-│   ├── services/     # I3 service handlers
-│   ├── models/       # Data structures
-│   ├── config/       # Configuration management
-│   └── state/        # State and cache management
-├── tests/            # Test suite
-├── config/           # Configuration files
-└── docs/             # Documentation
+Intermud3/
+├── src/
+│   ├── __main__.py    # Entry point
+│   ├── gateway.py     # Main gateway service
+│   ├── network/       # MudMode protocol implementation
+│   ├── services/      # I3 service handlers
+│   ├── models/        # Data structures
+│   ├── config/        # Configuration management
+│   ├── state/         # State and cache management
+│   └── utils/         # Utilities and logging
+├── tests/             # Test suite
+│   ├── unit/          # Unit tests
+│   ├── integration/   # Integration tests
+│   └── fixtures/      # Test fixtures
+├── config/            # Configuration files
+│   └── config.yaml    # Main configuration
+├── docs/              # Documentation
+│   ├── intermud3_docs/# I3 protocol documentation
+│   ├── HIGH_LEVEL_PLAN.md
+│   └── TODO.md
+├── requirements.txt   # Core dependencies
+├── pyproject.toml     # Project metadata
+├── Makefile           # Build automation
+└── docker-compose.yml # Docker deployment
 ```
 
 ## Contributing
@@ -164,8 +201,8 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/yourusername/i3-gateway/issues)
-- Documentation: [Full documentation](https://i3-gateway.readthedocs.io)
+- GitHub Issues: [Report bugs or request features](https://github.com/yourusername/intermud3-gateway/issues)
+- Documentation: See `docs/` directory for full documentation
 
 ## Acknowledgments
 
