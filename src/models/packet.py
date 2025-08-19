@@ -359,6 +359,60 @@ class ChannelPacket(I3Packet):
 
 
 @dataclass
+class ChannelMessagePacket(I3Packet):
+    """Channel message packet with visname support."""
+    packet_type: PacketType = field(default=PacketType.CHANNEL_M, init=False)
+    channel: str = ""
+    visname: str = ""
+    message: str = ""
+    
+    def validate(self) -> None:
+        """Validate channel message packet."""
+        super().validate()
+        
+        if not self.channel:
+            raise PacketValidationError("Channel name is required")
+        
+        if not self.message:
+            raise PacketValidationError("Channel message is required")
+        
+        # Visname defaults to originator_user if not specified
+        if not self.visname and self.originator_user:
+            self.visname = self.originator_user
+    
+    def to_lpc_array(self) -> List[Any]:
+        """Convert to LPC array."""
+        return [
+            self.packet_type.value,
+            self.ttl,
+            self.originator_mud,
+            self.originator_user,
+            0,  # target_mud is 0 for broadcast
+            0,  # target_user is 0 for broadcast
+            self.channel,
+            self.visname,
+            self.message
+        ]
+    
+    @classmethod
+    def from_lpc_array(cls, data: List[Any]) -> 'ChannelMessagePacket':
+        """Create from LPC array."""
+        if len(data) < 9:
+            raise PacketValidationError(f"Invalid channel-m packet: expected 9+ fields, got {len(data)}")
+        
+        return cls(
+            ttl=int(data[1]) if data[1] else 0,
+            originator_mud=str(data[2]) if data[2] else "",
+            originator_user=str(data[3]) if data[3] else "",
+            target_mud="0",  # Always broadcast
+            target_user="",
+            channel=str(data[6]) if data[6] else "",
+            visname=str(data[7]) if data[7] else "",
+            message=str(data[8]) if data[8] else ""
+        )
+
+
+@dataclass
 class WhoPacket(I3Packet):
     """Who request/reply packet."""
     # For who-req

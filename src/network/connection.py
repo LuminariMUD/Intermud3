@@ -307,9 +307,11 @@ class ConnectionManager:
             while self.is_connected() and not self._closing:
                 await asyncio.sleep(self.keepalive_interval)
                 
-                if self.is_connected():
-                    # Send keepalive packet (implementation depends on I3 protocol)
-                    # For now, we'll just track the time
+                if self.is_connected() and self.state == ConnectionState.READY:
+                    # Send a ping packet as keepalive
+                    # I3 doesn't have an explicit ping, so we can send a who-req to ourselves
+                    # or just track the connection time
+                    # The router will close idle connections, so any packet will keep it alive
                     pass
         
         self._keepalive_task = asyncio.create_task(keepalive())

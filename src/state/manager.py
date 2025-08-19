@@ -112,6 +112,7 @@ class StateManager:
         
         # Channel information
         self.channels: Dict[str, ChannelInfo] = {}
+        self.chanlist_id: int = 0
         self.channel_lock = asyncio.Lock()
         
         # User sessions
@@ -238,6 +239,42 @@ class StateManager:
         """
         async with self.channel_lock:
             return list(self.channels.values())
+    
+    async def update_chanlist(self, chanlist_data: Dict[str, Any], chanlist_id: int):
+        """Update the channel list from router data.
+        
+        Args:
+            chanlist_data: Channel list data from router
+            chanlist_id: Channel list ID from router
+        """
+        async with self.channel_lock:
+            self.chanlist_id = chanlist_id
+            
+            # Update channels
+            for channel_name, channel_data in chanlist_data.items():
+                if channel_name not in self.channels:
+                    # Create new channel info
+                    self.channels[channel_name] = ChannelInfo(
+                        name=channel_name,
+                        owner=channel_data.get('owner', '') if isinstance(channel_data, dict) else '',
+                        type=channel_data.get('type', 0) if isinstance(channel_data, dict) else 0
+                    )
+                else:
+                    # Update existing channel
+                    if isinstance(channel_data, dict):
+                        self.channels[channel_name].owner = channel_data.get('owner', '')
+                        self.channels[channel_name].type = channel_data.get('type', 0)
+    
+    async def get_mud(self, mud_name: str) -> Optional[MudInfo]:
+        """Get information about a specific MUD (alias for get_mud_info).
+        
+        Args:
+            mud_name: Name of the MUD
+            
+        Returns:
+            MUD information or None if not found
+        """
+        return await self.get_mud_info(mud_name)
     
     async def create_session(self, mud_name: str, user_name: str) -> UserSession:
         """Create a new user session.

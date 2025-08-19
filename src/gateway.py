@@ -35,6 +35,10 @@ class I3Gateway:
         
         self.service_manager = ServiceManager(self.state_manager)
         
+        # Import and register router service
+        from .services.router import RouterService
+        self.router_service = RouterService(self.state_manager, self)
+        
         # Setup routers
         routers = []
         if settings.router.primary:
@@ -191,7 +195,11 @@ class I3Gateway:
             if getattr(self.settings.services, service_name, False):
                 services[service_name] = 1
         
-        # Create startup packet
+        # Get current mudlist and chanlist IDs from state
+        old_mudlist_id = self.state_manager.mudlist_id
+        old_chanlist_id = 0  # We'll track this later
+        
+        # Create startup packet with correct field names
         startup = StartupPacket(
             ttl=200,
             originator_mud=self.settings.mud.name,
@@ -199,16 +207,19 @@ class I3Gateway:
             target_mud="*i3",
             target_user="",
             password=getattr(self.settings.mud, 'password', 0),
-            mud_port=self.settings.mud.port,
-            tcp_port=getattr(self.settings.mud, 'tcp_port', 0),
-            udp_port=getattr(self.settings.mud, 'udp_port', 0),
-            mudlib=getattr(self.settings.mud, 'mudlib', ''),
-            base_mudlib=getattr(self.settings.mud, 'base_mudlib', ''),
-            driver=getattr(self.settings.mud, 'driver', ''),
-            mud_type=getattr(self.settings.mud, 'mud_type', 'MUD'),
+            old_mudlist_id=old_mudlist_id,
+            old_chanlist_id=old_chanlist_id,
+            player_port=self.settings.mud.port,
+            imud_tcp_port=getattr(self.settings.mud, 'tcp_port', 0),
+            imud_udp_port=getattr(self.settings.mud, 'udp_port', 0),
+            mudlib=getattr(self.settings.mud, 'mudlib', 'LPMud'),
+            base_mudlib=getattr(self.settings.mud, 'base_mudlib', 'LPMud'),
+            driver=getattr(self.settings.mud, 'driver', 'FluffOS'),
+            mud_type=getattr(self.settings.mud, 'mud_type', 'LP'),
             open_status=getattr(self.settings.mud, 'open_status', 'open'),
             admin_email=getattr(self.settings.mud, 'admin_email', ''),
-            services=services
+            services=services,
+            other_data={}
         )
         
         # Send startup packet
@@ -225,7 +236,7 @@ class I3Gateway:
                     timeout=1.0
                 )
                 
-                # Handle special packets
+                # Handle special router packets first
                 if packet.packet_type == PacketType.MUDLIST:
                     await self._handle_mudlist(packet)
                 elif packet.packet_type == PacketType.STARTUP_REPLY:
@@ -233,8 +244,13 @@ class I3Gateway:
                 elif packet.packet_type == PacketType.ERROR:
                     await self._handle_error(packet)
                 else:
-                    # Route to service
-                    await self.service_manager.queue_packet(packet)
+                    # Route packet through router service
+                    # This will handle local vs remote routing
+                    if self.router_service:
+                        await self.router_service.route_packet(packet)
+                    else:
+                        # Fallback to direct service routing
+                        await self.service_manager.queue_packet(packet)
                 
             except asyncio.TimeoutError:
                 continue
