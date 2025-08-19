@@ -10,7 +10,7 @@ import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Deque, Dict, Optional, Set
+from typing import Any, Deque, Dict, List, Optional, Set
 
 from src.config.models import APIConfig
 from src.utils.logging import get_logger
