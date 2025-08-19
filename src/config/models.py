@@ -148,6 +148,88 @@ class MetricsConfig(BaseModel):
     path: str = "/metrics"
 
 
+class WebSocketConfig(BaseModel):
+    """WebSocket configuration."""
+
+    enabled: bool = True
+    max_connections: int = 1000
+    ping_interval: int = 30
+    ping_timeout: int = 10
+    max_frame_size: int = 65536
+    compression: bool = True
+
+
+class TCPConfig(BaseModel):
+    """TCP socket configuration."""
+
+    enabled: bool = True
+    port: int = 8081
+    max_connections: int = 500
+    buffer_size: int = 4096
+
+
+class APIKeyConfig(BaseModel):
+    """API key configuration."""
+
+    key: str
+    mud_name: str
+    permissions: list[str] = Field(default_factory=lambda: ["*"])
+    rate_limit_override: int | None = None
+
+
+class APIAuthConfig(BaseModel):
+    """API authentication configuration."""
+
+    enabled: bool = True
+    require_tls: bool = False
+    api_keys: list[APIKeyConfig] = Field(default_factory=list)
+
+
+class RateLimitConfig(BaseModel):
+    """Rate limit configuration."""
+
+    per_minute: int = 100
+    burst: int = 20
+
+
+class APIRateLimitsConfig(BaseModel):
+    """API rate limits configuration."""
+
+    default: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    by_method: dict[str, int] = Field(default_factory=dict)
+
+
+class SessionConfig(BaseModel):
+    """Session management configuration."""
+
+    timeout: int = 3600
+    max_queue_size: int = 1000
+    queue_ttl: int = 300
+    cleanup_interval: int = 60
+
+
+class APIMetricsConfig(BaseModel):
+    """API metrics configuration."""
+
+    enabled: bool = True
+    export_interval: int = 60
+    include_details: bool = True
+
+
+class APIConfig(BaseModel):
+    """API server configuration."""
+
+    enabled: bool = True
+    host: str = "0.0.0.0"
+    port: int = 8080
+    websocket: WebSocketConfig = Field(default_factory=WebSocketConfig)
+    tcp: TCPConfig = Field(default_factory=TCPConfig)
+    auth: APIAuthConfig = Field(default_factory=APIAuthConfig)
+    rate_limits: APIRateLimitsConfig = Field(default_factory=APIRateLimitsConfig)
+    session: SessionConfig = Field(default_factory=SessionConfig)
+    metrics: APIMetricsConfig = Field(default_factory=APIMetricsConfig)
+
+
 class DevelopmentConfig(BaseModel):
     """Development settings."""
 
@@ -162,6 +244,7 @@ class Settings(BaseModel):
     mud: MudConfig
     router: RouterConfig
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
+    api: APIConfig = Field(default_factory=APIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     channels: ChannelConfig = Field(default_factory=ChannelConfig)
     state: StateConfig = Field(default_factory=StateConfig)
