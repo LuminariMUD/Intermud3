@@ -1,0 +1,123 @@
+# I3 Gateway Configuration
+# This file defines the default configuration for the I3 Gateway
+
+mud:
+  name: ${MUD_NAME:TestMUD}
+  port: ${MUD_PORT:4000}
+  admin_email: ${MUD_ADMIN_EMAIL:admin@testmud.com}
+  mudlib: "Custom"
+  base_mudlib: "LPMud"
+  driver: "FluffOS"
+  mud_type: ${MUD_TYPE:LP}
+  open_status: ${MUD_STATUS:open}
+  
+  # Service capabilities (1 = enabled, 0 = disabled)
+  services:
+    tell: ${ENABLE_TELL:1}
+    emoteto: 1
+    channel: ${ENABLE_CHANNEL:1}
+    who: ${ENABLE_WHO:1}
+    finger: ${ENABLE_FINGER:1}
+    locate: ${ENABLE_LOCATE:1}
+    chanlist-req: 1
+    chanlist-reply: 1
+    chan-who-req: 1
+    chan-who-reply: 1
+    auth: 1
+    ucache: 1
+    
+  # OOB (Out-of-band) services
+  oob_services:
+    mail: ${ENABLE_OOB_MAIL:0}
+    news: ${ENABLE_OOB_NEWS:0}
+    file: ${ENABLE_OOB_FILE:0}
+    http: 0
+    ftp: 0
+    nntp: 0
+    smtp: 0
+    
+router:
+  primary:
+    host: ${I3_ROUTER_HOST:204.209.44.3}
+    port: ${I3_ROUTER_PORT:8080}
+    password: ${I3_ROUTER_PASSWORD:0}
+    
+  fallback:
+    - host: ${I3_FALLBACK_ROUTER_HOST:}
+      port: ${I3_FALLBACK_ROUTER_PORT:8080}
+      
+  # Connection settings
+  connection:
+    timeout: ${CONNECTION_TIMEOUT:300}
+    keepalive_interval: ${KEEPALIVE_INTERVAL:60}
+    reconnect_delay: 30
+    max_reconnect_attempts: 10
+    
+gateway:
+  # API server settings
+  host: ${GATEWAY_HOST:localhost}
+  port: ${GATEWAY_PORT:4001}
+  
+  # Protocol settings
+  max_packet_size: ${GATEWAY_MAX_PACKET_SIZE:65536}
+  timeout: ${GATEWAY_TIMEOUT:30}
+  retry_attempts: ${GATEWAY_RETRY_ATTEMPTS:3}
+  retry_delay: ${GATEWAY_RETRY_DELAY:5}
+  
+  # Performance settings
+  max_connections: ${MAX_CONNECTIONS:100}
+  queue_size: 1000
+  worker_threads: 4
+  
+  # Security
+  auth:
+    enabled: ${ENABLE_AUTH:true}
+    secret: ${I3_GATEWAY_SECRET:}
+    token_expiry: 3600
+    
+logging:
+  level: ${LOG_LEVEL:INFO}
+  format: ${LOG_FORMAT:json}
+  file: ${LOG_FILE:logs/i3-gateway.log}
+  max_size: 10485760  # 10MB
+  backup_count: 5
+  
+  # Component-specific log levels
+  components:
+    network: INFO
+    services: INFO
+    api: INFO
+    state: WARNING
+    
+# Channel configuration
+channels:
+  default_channels:
+    - name: "intermud"
+      type: 0  # Public channel
+    - name: "chat"
+      type: 0
+    - name: "dev"
+      type: 0
+      
+  # Channel settings
+  history_size: 100
+  max_message_length: 2048
+  
+# State management
+state:
+  directory: "state/"
+  save_interval: 300  # Save state every 5 minutes
+  backup_enabled: true
+  backup_count: 3
+  
+# Metrics and monitoring
+metrics:
+  enabled: true
+  port: 8080
+  path: "/metrics"
+  
+# Development settings
+development:
+  debug: ${DEBUG:false}
+  reload: ${RELOAD:false}
+  profile: ${PROFILE:false}

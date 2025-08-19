@@ -1,0 +1,183 @@
+"""Configuration models for I3 Gateway."""
+
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field, validator
+
+
+class ServiceConfig(BaseModel):
+    """I3 service capabilities configuration."""
+    
+    tell: int = 1
+    emoteto: int = 1
+    channel: int = 1
+    who: int = 1
+    finger: int = 1
+    locate: int = 1
+    chanlist_req: int = Field(1, alias="chanlist-req")
+    chanlist_reply: int = Field(1, alias="chanlist-reply")
+    chan_who_req: int = Field(1, alias="chan-who-req")
+    chan_who_reply: int = Field(1, alias="chan-who-reply")
+    auth: int = 1
+    ucache: int = 1
+
+
+class OOBServiceConfig(BaseModel):
+    """Out-of-band service configuration."""
+    
+    mail: int = 0
+    news: int = 0
+    file: int = 0
+    http: int = 0
+    ftp: int = 0
+    nntp: int = 0
+    smtp: int = 0
+
+
+class MudConfig(BaseModel):
+    """MUD configuration."""
+    
+    name: str
+    port: int
+    admin_email: str
+    mudlib: str = "Custom"
+    base_mudlib: str = "LPMud"
+    driver: str = "FluffOS"
+    mud_type: str = "LP"
+    open_status: str = "open"
+    services: ServiceConfig = Field(default_factory=ServiceConfig)
+    oob_services: OOBServiceConfig = Field(default_factory=OOBServiceConfig)
+
+
+class RouterConnectionConfig(BaseModel):
+    """Router connection settings."""
+    
+    timeout: int = 300
+    keepalive_interval: int = 60
+    reconnect_delay: int = 30
+    max_reconnect_attempts: int = 10
+
+
+class RouterHostConfig(BaseModel):
+    """Router host configuration."""
+    
+    host: str
+    port: int = 8080
+    password: int = 0
+
+
+class RouterConfig(BaseModel):
+    """Router configuration."""
+    
+    primary: RouterHostConfig
+    fallback: List[RouterHostConfig] = Field(default_factory=list)
+    connection: RouterConnectionConfig = Field(default_factory=RouterConnectionConfig)
+
+
+class GatewayAuthConfig(BaseModel):
+    """Gateway authentication configuration."""
+    
+    enabled: bool = True
+    secret: Optional[str] = None
+    token_expiry: int = 3600
+
+
+class GatewayConfig(BaseModel):
+    """Gateway server configuration."""
+    
+    host: str = "localhost"
+    port: int = 4001
+    max_packet_size: int = 65536
+    timeout: int = 30
+    retry_attempts: int = 3
+    retry_delay: int = 5
+    max_connections: int = 100
+    queue_size: int = 1000
+    worker_threads: int = 4
+    auth: GatewayAuthConfig = Field(default_factory=GatewayAuthConfig)
+
+
+class LogComponentConfig(BaseModel):
+    """Component-specific log levels."""
+    
+    network: str = "INFO"
+    services: str = "INFO"
+    api: str = "INFO"
+    state: str = "WARNING"
+
+
+class LoggingConfig(BaseModel):
+    """Logging configuration."""
+    
+    level: str = "INFO"
+    format: str = "json"
+    file: Optional[str] = None
+    max_size: int = 10485760  # 10MB
+    backup_count: int = 5
+    components: LogComponentConfig = Field(default_factory=LogComponentConfig)
+
+
+class ChannelDefinition(BaseModel):
+    """Channel definition."""
+    
+    name: str
+    type: int = 0  # 0 = public, 1 = private
+
+
+class ChannelConfig(BaseModel):
+    """Channel configuration."""
+    
+    default_channels: List[ChannelDefinition] = Field(default_factory=list)
+    history_size: int = 100
+    max_message_length: int = 2048
+
+
+class StateConfig(BaseModel):
+    """State management configuration."""
+    
+    directory: str = "state/"
+    save_interval: int = 300
+    backup_enabled: bool = True
+    backup_count: int = 3
+
+
+class MetricsConfig(BaseModel):
+    """Metrics configuration."""
+    
+    enabled: bool = True
+    port: int = 8080
+    path: str = "/metrics"
+
+
+class DevelopmentConfig(BaseModel):
+    """Development settings."""
+    
+    debug: bool = False
+    reload: bool = False
+    profile: bool = False
+
+
+class Settings(BaseModel):
+    """Main settings configuration."""
+    
+    mud: MudConfig
+    router: RouterConfig
+    gateway: GatewayConfig = Field(default_factory=GatewayConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    channels: ChannelConfig = Field(default_factory=ChannelConfig)
+    state: StateConfig = Field(default_factory=StateConfig)
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+    development: DevelopmentConfig = Field(default_factory=DevelopmentConfig)
+    
+    @validator("gateway")
+    def validate_gateway_auth(cls, v: GatewayConfig) -> GatewayConfig:
+        """Validate gateway authentication settings."""
+        if v.auth.enabled and not v.auth.secret:
+            raise ValueError("Gateway auth is enabled but no secret provided")
+        return v
+    
+    class Config:
+        """Pydantic configuration."""
+        
+        allow_population_by_field_name = True
