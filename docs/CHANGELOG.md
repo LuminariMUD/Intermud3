@@ -5,6 +5,31 @@ All notable changes to the Intermud3 Gateway Service will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2025-08-20
+
+### Added
+- Complete API method implementations via new `APIHandlers` class
+  - Communication methods: `tell`, `emoteto`
+  - Channel methods: `channel_send`, `channel_emote`, `channel_join`, `channel_leave`, `channel_list`, `channel_who`, `channel_history`
+  - Information methods: `who`, `finger`, `locate`, `mudlist`
+  - Administrative methods: `ping`, `status`, `stats`, `reconnect`
+- State manager query methods for caching and data retrieval
+  - `get_mudlist()`, `get_channel_history()`, `get_who_data()`
+  - `get_finger_data()`, `get_locate_data()`, `get_stats()`
+- Gateway helper methods: `is_connected()` and `reconnect()`
+
+### Fixed
+- Event loop scope error in `__main__.py` - initialized variables before try block
+- TCP server syntax error - removed extra closing parenthesis
+- Import conflict - renamed `handlers.py` to `api_handlers.py` to avoid directory conflict
+- TCP server handler integration - now properly routes through APIHandlers
+- State manager instantiation in API handlers
+
+### Changed
+- API methods now return proper responses instead of echo placeholders
+- TCP and WebSocket servers share the same APIHandlers instance
+- Improved error handling and response formatting in API methods
+
 ## [0.3.5] - 2025-08-20
 
 ### Fixed
