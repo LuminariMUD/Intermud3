@@ -1,14 +1,22 @@
 include README.md
-include LICENSE
+include LICENSE.md
 include requirements.txt
 include requirements-dev.txt
 include pyproject.toml
-recursive-include src/i3_gateway *.py *.typed
+include setup.cfg
+include Makefile
+recursive-include src *.py *.typed
 recursive-include config *.yaml *.yml
 recursive-include tests *.py
+recursive-include docs *.md *.rst
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * .git*
+recursive-exclude * .pytest_cache
+recursive-exclude * .mypy_cache
+recursive-exclude * .ruff_cache
 prune .github
 prune docs/_build
+prune htmlcov
 prune venv
+prune .venv

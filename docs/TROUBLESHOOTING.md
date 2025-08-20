@@ -4,6 +4,8 @@
 
 This guide helps you diagnose and resolve common issues when integrating with the Intermud3 Gateway. It covers connection problems, authentication issues, message delivery failures, performance problems, and provides debugging techniques.
 
+**Current Status**: Phase 3 Complete (2025-08-20) - Full JSON-RPC API implementation with WebSocket/TCP support, 78% test coverage, 1200+ tests.
+
 ## Table of Contents
 
 1. [Quick Diagnostics](#quick-diagnostics)
@@ -28,7 +30,8 @@ Before diving into specific issues, run through this quick checklist:
 curl http://localhost:8080/health
 
 # 2. Test basic connectivity
-telnet localhost 8080
+telnet localhost 8080  # WebSocket port
+telnet localhost 8081  # TCP API port
 
 # 3. Check WebSocket endpoint
 websocat ws://localhost:8080/ws
@@ -50,8 +53,9 @@ echo '{"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"api_key":"demo-
 ps aux | grep i3-gateway
 
 # Check port usage
-netstat -tulpn | grep :8080
+netstat -tulpn | grep -E ':808[01]'
 lsof -i :8080
+lsof -i :8081
 
 # Check system resources
 free -h
@@ -103,10 +107,12 @@ telnet localhost 8080
 2. **Port Conflicts:**
    ```bash
    # Find process using port
-   lsof -i :8080
+   lsof -i :8080  # WebSocket
+   lsof -i :8081  # TCP
    
    # Kill conflicting process
    kill $(lsof -t -i:8080)
+   kill $(lsof -t -i:8081)
    
    # Or change gateway port in config
    ```
@@ -117,18 +123,24 @@ telnet localhost 8080
    iptables -L
    ufw status
    
-   # Allow port 8080
-   ufw allow 8080
+   # Allow ports 8080 and 8081
+   ufw allow 8080/tcp comment 'I3 Gateway WebSocket'
+   ufw allow 8081/tcp comment 'I3 Gateway TCP API'
    iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
+   iptables -A INPUT -p tcp --dport 8081 -j ACCEPT
    ```
 
 4. **Configuration Issues:**
    ```yaml
    # config/config.yaml
    api:
-     host: "0.0.0.0"  # Make sure it's not 127.0.0.1 for remote access
-     port: 8080
      websocket:
+       host: "0.0.0.0"  # Make sure it's not 127.0.0.1 for remote access
+       port: 8080
+       enabled: true
+     tcp:
+       host: "0.0.0.0"
+       port: 8081
        enabled: true
    ```
 

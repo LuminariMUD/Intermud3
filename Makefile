@@ -22,11 +22,11 @@ help: ## Show this help message
 
 install: ## Install production dependencies
 	$(PIP) install --upgrade pip
-	$(PIP) install -e .
+	$(PIP) install -r requirements.txt
 
 install-dev: ## Install development dependencies
 	$(PIP) install --upgrade pip
-	$(PIP) install -e ".[dev,security,docs]"
+	$(PIP) install -r requirements-dev.txt
 	pre-commit install
 
 test: ## Run all tests
@@ -120,11 +120,9 @@ docs: ## Build documentation with Sphinx
 docs-serve: ## Serve documentation locally
 	cd docs/_build/html && $(PYTHON) -m http.server 8000
 
-requirements: ## Generate requirements.txt from pyproject.toml
-	pip-compile pyproject.toml -o requirements.txt
-
-requirements-dev: ## Generate requirements-dev.txt from pyproject.toml
-	pip-compile --extra dev pyproject.toml -o requirements-dev.txt
+update-requirements: ## Update requirements files
+	@echo "$(YELLOW)Requirements files should be manually maintained$(NC)"
+	@echo "$(YELLOW)See requirements.txt and requirements-dev.txt$(NC)"
 
 check: lint type-check test ## Run all checks (lint, type-check, test)
 	@echo "$(GREEN)All checks passed!$(NC)"

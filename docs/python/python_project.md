@@ -2,65 +2,105 @@
 
 ## Project Overview
 
-The Intermud3 Gateway is a standalone Python service that bridges MUDs to the global Intermud-3 network, handling protocol complexity while exposing a simple JSON-RPC API.
+The Intermud3 Gateway is a standalone Python service that bridges MUDs to the global Intermud-3 network, handling protocol complexity while exposing comprehensive WebSocket and TCP APIs. The project implements full I3 protocol support with event-driven architecture, session management, and real-time communication capabilities.
 
 ## Current Project Structure
 
 ```
 Intermud3/
-├── .github/                    # GitHub configuration
-│   └── ci.yml                  # CI/CD workflow
-├── .vscode/                    # VS Code settings
-│   └── settings.json
+├── clients/                    # Client implementations
+│   ├── circlemud/              # CircleMUD integration
+│   ├── examples/               # Example client implementations
+│   ├── javascript/             # JavaScript client library
+│   └── python/                 # Python client library
 ├── config/                     # Gateway configuration
 │   └── config.yaml
 ├── docs/                       # Documentation
+│   ├── ai_tools/               # AI development tools docs
 │   ├── intermud3_docs/         # I3 protocol documentation
 │   ├── previous_changelogs/    # Historical changes
+│   ├── projects/               # Project planning docs
 │   ├── python/                 # Python project docs
+│   ├── API.md
+│   ├── API_REFERENCE.md
+│   ├── ARCHITECTURE.md
 │   ├── CHANGELOG.md
-│   ├── HIGH_LEVEL_PLAN.md
-│   └── TODO.md
+│   ├── DEPLOYMENT.md
+│   ├── INTEGRATION_GUIDE.md
+│   ├── PERFORMANCE_TUNING.md
+│   ├── TODO.md
+│   └── TROUBLESHOOTING.md
 ├── src/                        # Source code
 │   ├── __init__.py
 │   ├── __main__.py             # Entry point
 │   ├── gateway.py              # Main gateway class
+│   ├── api/                    # API layer
+│   │   ├── auth.py             # Authentication
+│   │   ├── event_bridge.py     # Event distribution
+│   │   ├── events.py           # Event definitions
+│   │   ├── handlers/           # API request handlers
+│   │   ├── health.py           # Health checks
+│   │   ├── protocol.py         # Protocol handlers
+│   │   ├── queue.py            # Message queuing
+│   │   ├── server.py           # WebSocket server
+│   │   ├── session.py          # Session management
+│   │   ├── state.py            # State management
+│   │   ├── subscriptions.py    # Event subscriptions
+│   │   └── tcp_server.py       # TCP server
 │   ├── config/                 # Configuration module
 │   │   ├── __init__.py
 │   │   ├── loader.py
 │   │   └── models.py
 │   ├── models/                 # Data models
-│   │   └── __init__.py
+│   │   ├── connection.py       # Connection models
+│   │   └── packet.py           # Packet models
 │   ├── network/                # Network layer
-│   │   └── __init__.py
+│   │   ├── connection_pool.py  # Connection pooling
+│   │   ├── connection.py       # Network connections
+│   │   ├── lpc.py              # LPC protocol support
+│   │   └── mudmode.py          # MUD mode handling
 │   ├── services/               # I3 services
-│   │   └── __init__.py
+│   │   ├── base.py             # Base service class
+│   │   ├── channel.py          # Channel service
+│   │   ├── finger.py           # Finger service
+│   │   ├── locate.py           # Locate service
+│   │   ├── router.py           # Router service
+│   │   ├── tell.py             # Tell service
+│   │   └── who.py              # Who service
 │   ├── state/                  # State management
-│   │   └── __init__.py
+│   │   └── manager.py          # State manager
 │   ├── utils/                  # Utilities
-│   │   ├── __init__.py
-│   │   └── logging.py
+│   │   ├── circuit_breaker.py  # Circuit breaker pattern
+│   │   ├── logging.py          # Logging utilities
+│   │   ├── retry.py            # Retry logic
+│   │   └── shutdown.py         # Graceful shutdown
 │   └── py.typed                # Type checking marker
-├── tests/                      # Test suite
-│   ├── __init__.py
+├── tests/                      # Test suite (1200+ tests)
+│   ├── api/                    # API tests
 │   ├── conftest.py             # Pytest fixtures
 │   ├── fixtures/               # Test data
 │   ├── integration/            # Integration tests
+│   ├── performance/            # Performance tests
+│   ├── services/               # Service tests
 │   └── unit/                   # Unit tests
-├── .env.example                # Environment template
+├── .editorconfig               # Editor configuration
 ├── .gitignore                  # Git ignore rules
 ├── .pre-commit-config.yaml     # Pre-commit hooks
-├── CLAUDE.md                   # Claude Code instructions
+├── .ruff.toml                  # Ruff linter configuration
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
 ├── Dockerfile                  # Container definition
 ├── docker-compose.yml          # Multi-container setup
+├── docker-compose.override.yml # Development overrides
+├── docker-compose.prod.yml     # Production setup
 ├── LICENSE.md
 ├── Makefile                    # Build automation
+├── MANIFEST.in                 # Package manifest
 ├── pyproject.toml              # Project configuration
 ├── README.md
 ├── requirements.txt            # Production dependencies
-└── requirements-dev.txt        # Development dependencies
+├── requirements-dev.txt        # Development dependencies
+└── setup.cfg                   # Additional setup configuration
 ```
 
 ## Active Configuration

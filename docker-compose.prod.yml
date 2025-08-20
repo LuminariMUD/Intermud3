@@ -1,0 +1,81 @@
+# Docker Compose Production Configuration
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  i3-gateway:
+    image: i3-gateway:latest
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      - LOG_LEVEL=WARNING
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+    volumes:
+      # Read-only config
+      - ./config:/app/config:ro
+      # Persistent state with backup
+      - i3-state:/app/state
+      - i3-logs:/app/logs
+    networks:
+      - i3-network
+      - external-network
+    
+  # Monitoring should be on separate network in production
+  prometheus:
+    profiles:
+      - monitoring
+    networks:
+      - monitoring-network
+      - i3-network
+    
+  grafana:
+    profiles:
+      - monitoring
+    networks:
+      - monitoring-network
+      - external-network
+    environment:
+      # Use strong password from secret
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+    secrets:
+      - grafana_password
+
+networks:
+  i3-network:
+    driver: bridge
+    internal: true
+  external-network:
+    driver: bridge
+  monitoring-network:
+    driver: bridge
+    internal: true
+
+volumes:
+  i3-state:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/i3-gateway/state
+  i3-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/i3-gateway
+
+secrets:
+  grafana_password:
+    external: true

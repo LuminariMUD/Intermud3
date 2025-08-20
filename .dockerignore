@@ -11,13 +11,18 @@ venv/
 *.egg-info/
 dist/
 build/
+*.egg
+.eggs/
 
 # Testing
 .pytest_cache/
 .coverage
+coverage.json
+coverage.xml
 htmlcov/
 .tox/
 .hypothesis/
+tests/
 
 # IDE
 .vscode/
@@ -30,8 +35,11 @@ htmlcov/
 .git/
 .gitignore
 
-# Documentation
-docs/
+# Documentation (keep API docs for reference)
+docs/projects/
+docs/*.md
+!docs/API_REFERENCE.md
+!docs/INTEGRATION_GUIDE.md
 *.md
 !README.md
 
@@ -42,8 +50,11 @@ docs/
 # Development
 Makefile
 pytest.ini
+pyproject.toml
 .mypy_cache/
 .ruff_cache/
+CLAUDE.md
+TODO.md
 
 # Logs and state (will be mounted as volumes)
 logs/

@@ -16,31 +16,102 @@ indent_style = space
 indent_size = 4
 max_line_length = 100
 
+# Python type stub files
+[*.pyi]
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
 # YAML files
 [*.{yml,yaml}]
 indent_style = space
 indent_size = 2
+max_line_length = 120
 
 # JSON files
 [*.json]
 indent_style = space
 indent_size = 2
+max_line_length = 120
+
+# JavaScript/TypeScript files
+[*.{js,ts,jsx,tsx}]
+indent_style = space
+indent_size = 2
+max_line_length = 100
+
+# CSS/SCSS files
+[*.{css,scss,sass}]
+indent_style = space
+indent_size = 2
+max_line_length = 120
+
+# HTML files
+[*.html]
+indent_style = space
+indent_size = 2
+max_line_length = 120
+
+# XML files
+[*.xml]
+indent_style = space
+indent_size = 2
+max_line_length = 120
 
 # Markdown files
 [*.md]
 trim_trailing_whitespace = false
 max_line_length = 80
+indent_style = space
+indent_size = 2
+
+# reStructuredText files
+[*.rst]
+trim_trailing_whitespace = false
+max_line_length = 80
+indent_style = space
+indent_size = 3
 
 # Makefile
 [Makefile]
 indent_style = tab
+indent_size = 4
 
 # Shell scripts
 [*.sh]
 indent_style = space
 indent_size = 4
+max_line_length = 100
 
 # TOML files
 [*.toml]
 indent_style = space
 indent_size = 4
+max_line_length = 100
+
+# Configuration files
+[*.{conf,config,cfg,ini}]
+indent_style = space
+indent_size = 4
+
+# C/C++ files (for CircleMUD client)
+[*.{c,h,cpp,hpp}]
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
+# SQL files
+[*.sql]
+indent_style = space
+indent_size = 2
+max_line_length = 120
+
+# Docker files
+[Dockerfile*]
+indent_style = space
+indent_size = 4
+
+# Ignore files
+[.gitignore]
+indent_style = space
+indent_size = 2

@@ -182,8 +182,12 @@ CLAUDE.md
 state/*.json
 state/*.yaml
 config/local.yaml
+config/production.yaml
+config/staging.yaml
 *.lpc
 *.i3p
+*.mud
+*.lib
 
 # Ruff
 .ruff_cache/
@@ -192,3 +196,55 @@ config/local.yaml
 test-results/
 test-reports/
 .benchmarks/
+
+# Performance and monitoring
+*.prof
+*.pstats
+*.trace
+
+# Temporary and backup files
+*~
+*.orig
+*.rej
+.#*
+#*#
+
+# OS specific files (additional)
+.fuse_hidden*
+*.lnk
+$RECYCLE.BIN/
+
+# Development tools
+.pre-commit-config.local.yaml
+.vscode/settings.json
+.vscode/launch.json
+.idea/workspace.xml
+.idea/tasks.xml
+
+# Docker development
+docker-compose.override.yml
+.docker/
+
+# SSL/TLS certificates and keys
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime and PID files
+*.pid
+*.sock
+
+# Network and I3 specific
+router.db
+channels.db
+mudlist.db
+banlist.txt
+*.router

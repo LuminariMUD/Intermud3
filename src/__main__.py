@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from i3_gateway.config import load_config
-from i3_gateway.gateway import I3Gateway
-from i3_gateway.utils.logging import setup_logging
+from src.config import load_config
+from src.gateway import I3Gateway
+from src.utils.logging import setup_logging
 
 
 logger = structlog.get_logger()

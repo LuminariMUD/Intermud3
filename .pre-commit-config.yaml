@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -16,44 +16,80 @@ repos:
       - id: check-docstring-first
       - id: mixed-line-ending
         args: ['--fix=lf']
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: fix-byte-order-marker
+      - id: check-symlinks
+      - id: destroyed-symlinks
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
+    rev: v0.8.4
     hooks:
       - id: ruff
+        name: "Ruff linter"
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
+        name: "Ruff formatter"
 
   - repo: https://github.com/psf/black
-    rev: 23.12.1
+    rev: 24.10.0
     hooks:
       - id: black
+        name: "Format Python code with Black"
         language_version: python3.9
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+    rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: 
-          - types-pyyaml
+        name: "Type check with MyPy"
+        additional_dependencies:
+          - types-pyyaml>=6.0
           - types-setuptools
-          - pydantic
-        args: [--ignore-missing-imports, --strict]
+          - pydantic>=2.0
+          - aiohttp>=3.9.0
+          - structlog>=23.0
+          - click>=8.0
+        args: [--ignore-missing-imports, --strict, --show-error-codes]
         exclude: ^tests/
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.6
+    rev: 1.7.10
     hooks:
       - id: bandit
-        args: [-ll, -r, src/]
+        name: "Security check with Bandit"
+        args: [-ll, -r, src/, --skip, B101]
         exclude: ^tests/
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.13.0
+    rev: v3.29.1
     hooks:
       - id: commitizen
+        name: "Check commit message format"
       - id: commitizen-branch
+        name: "Check branch naming convention"
         stages: [push]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: "Sort imports with isort"
+        args: ["--profile", "black", "--line-length", "100"]
+
+  - repo: https://github.com/python-poetry/poetry
+    rev: 1.8.4
+    hooks:
+      - id: poetry-check
+        name: "Validate pyproject.toml"
+        files: pyproject.toml
+
+  - repo: https://github.com/charliermarsh/docformatter
+    rev: v1.7.5
+    hooks:
+      - id: docformatter
+        name: "Format docstrings"
+        args: [--in-place, --wrap-summaries, "100", --wrap-descriptions, "100"]
 
 default_language_version:
   python: python3.9
