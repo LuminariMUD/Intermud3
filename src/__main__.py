@@ -83,9 +83,10 @@ def main(
         log_file=settings.logging.file if not dry_run else None,
     )
 
+    from src import __version__
     logger.info(
         "Starting I3 Gateway",
-        version=__import__("i3_gateway").__version__,
+        version=__version__,
         config_file=str(config),
         debug=debug or settings.development.debug,
     )
@@ -97,12 +98,16 @@ def main(
         sys.exit(0)
 
     # Create and run gateway
+    loop = None
+    gateway = None
+    
     try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
         gateway = I3Gateway(settings)
 
         # Setup signal handlers
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, lambda s, f: handle_signal(s, gateway))
@@ -117,9 +122,10 @@ def main(
         logger.exception("Fatal error", error=str(e))
         sys.exit(1)
     finally:
-        if "gateway" in locals():
+        if gateway and loop:
             loop.run_until_complete(gateway.shutdown())
-        loop.close()
+        if loop:
+            loop.close()
         logger.info("I3 Gateway stopped")
 
 

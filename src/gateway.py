@@ -7,6 +7,7 @@ from typing import Any
 import structlog
 
 from .api.event_bridge import event_bridge
+from .api.server import APIServer
 from .config.models import Settings
 from .models.packet import I3Packet, PacketFactory, PacketType
 from .network import ConnectionManager, ConnectionState, RouterInfo
@@ -69,6 +70,9 @@ class I3Gateway:
         # Packet processing
         self.packet_queue: asyncio.Queue = asyncio.Queue()
         self._processing_task: asyncio.Task | None = None
+        
+        # API Server
+        self.api_server = APIServer(settings.api, self) if settings.api.enabled else None
 
     async def start(self) -> None:
         """Start the I3 Gateway service."""
@@ -92,6 +96,13 @@ class I3Gateway:
         if not connected:
             self.logger.error("Failed to connect to any I3 router")
             # Gateway will keep trying to reconnect automatically
+        
+        # Start API server if enabled
+        if self.api_server:
+            await self.api_server.start()
+            self.logger.info("API servers started", 
+                           websocket_port=self.settings.api.port,
+                           tcp_port=self.settings.api.tcp.port if self.settings.api.tcp.enabled else None)
 
         self.logger.info("I3 Gateway started successfully")
 
@@ -108,6 +119,10 @@ class I3Gateway:
             except asyncio.CancelledError:
                 pass
 
+        # Stop API server if running
+        if self.api_server:
+            await self.api_server.stop()
+        
         # Disconnect from router
         await self.connection_manager.disconnect()
 
@@ -195,8 +210,13 @@ class I3Gateway:
 
         # Build services dictionary
         services = {}
-        for service_name in ["tell", "channel", "who", "finger", "locate", "mail", "news", "file"]:
-            if getattr(self.settings.services, service_name, False):
+        # Regular services
+        for service_name in ["tell", "channel", "who", "finger", "locate"]:
+            if getattr(self.settings.mud.services, service_name, False):
+                services[service_name] = 1
+        # OOB services
+        for service_name in ["mail", "news", "file"]:
+            if getattr(self.settings.mud.oob_services, service_name, False):
                 services[service_name] = 1
 
         # Get current mudlist and chanlist IDs from state

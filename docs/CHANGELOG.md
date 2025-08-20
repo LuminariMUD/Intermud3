@@ -7,3 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.5] - 2025-08-20
 
+### Fixed
+- Fixed module import error in `__main__.py` - changed from `i3_gateway.__version__` to `src.__version__`
+- Fixed settings attribute access in `gateway.py` - services are under `mud.services` not `settings.services`
+- Fixed API server integration - added APIServer initialization and lifecycle management in gateway
+- Fixed SessionManager Pydantic model access - changed from dictionary syntax to attribute access
+- Fixed UnboundLocalError for event loop variable - moved loop initialization before try block
+- Fixed OOB services configuration - properly separated regular services from OOB services
+- Fixed TCP server not starting - enabled in config and integrated TCPServer class
+- Fixed TCP server stub - replaced placeholder with actual TCPServer integration
+
+### Changed
+- Updated deployment documentation to reflect .env file requirement
+- Simplified startup process - now just requires `python -m src` after configuration
+- API server now starts automatically with the gateway when enabled
+
+### Added
+- API server integration into main gateway lifecycle
+- Health check endpoint at `/health` returning JSON status
+- Metrics endpoint at `/metrics` with Prometheus-compatible format
+- TCP server now starts automatically alongside WebSocket (port 8081)
+- TCP treated as equal option to WebSocket for MUD connections
+- LuminariMUD API key configuration with full access permissions
+- TCP connection timeout increased from 5 minutes to 1 hour
+- Debug logging for TCP data reception
+

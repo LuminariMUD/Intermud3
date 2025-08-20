@@ -277,10 +277,10 @@ class SessionManager:
         # Load API keys from config
         if config.auth and config.auth.api_keys:
             for key_config in config.auth.api_keys:
-                self.api_keys[key_config["key"]] = {
-                    "mud_name": key_config["mud_name"],
-                    "permissions": set(key_config.get("permissions", [])),
-                    "rate_limit_override": key_config.get("rate_limit_override")
+                self.api_keys[key_config.key] = {
+                    "mud_name": key_config.mud_name,
+                    "permissions": set(key_config.permissions),
+                    "rate_limit_override": key_config.rate_limit_override
                 }
         
         logger.info(f"Session manager initialized with {len(self.api_keys)} API keys")

@@ -92,7 +92,7 @@ api:
     
   # TCP socket configuration
   tcp:
-    enabled: false
+    enabled: true
     port: 8081
     max_connections: 500
     buffer_size: 4096
@@ -102,6 +102,10 @@ api:
     enabled: ${API_AUTH_ENABLED:true}
     require_tls: false
     api_keys:
+      - key: ${API_KEY_LUMINARI:luminari-i3-gateway-2025}
+        mud_name: "LuminariMUD"
+        permissions: ["*"]
+        rate_limit_override: 500
       - key: ${API_KEY_DEMO:demo-key-123}
         mud_name: "DemoMUD"
         permissions: ["tell", "channel", "info"]

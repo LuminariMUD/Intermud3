@@ -17,6 +17,7 @@ from aiohttp.web_ws import WebSocketResponse
 
 from src.api.protocol import JSONRPCProtocol, JSONRPCRequest, JSONRPCError
 from src.api.session import Session, SessionManager
+from src.api.tcp_server import TCPServer
 from src.api.events import event_dispatcher
 from src.api.event_bridge import event_bridge
 from src.api.subscriptions import subscription_manager
@@ -47,6 +48,9 @@ class APIServer:
         # Protocol and session management
         self.protocol = JSONRPCProtocol()
         self.session_manager = SessionManager(config)
+        
+        # TCP server
+        self.tcp_server = TCPServer(config, self.session_manager) if config.tcp and config.tcp.enabled else None
         
         # Active WebSocket connections
         self._websockets: Set[WebSocketResponse] = set()
@@ -103,8 +107,9 @@ class APIServer:
             )
             
             # Start TCP server if enabled
-            if self.config.tcp and self.config.tcp.enabled:
-                asyncio.create_task(self._start_tcp_server())
+            if self.tcp_server:
+                await self.tcp_server.start()
+                logger.info(f"TCP server started on port {self.config.tcp.port}")
             
             # Start background tasks
             asyncio.create_task(self._cleanup_sessions())
@@ -125,6 +130,10 @@ class APIServer:
         # Close all WebSocket connections
         for ws in list(self._websockets):
             await ws.close(code=1001, message=b"Server shutting down")
+        
+        # Stop TCP server
+        if self.tcp_server:
+            await self.tcp_server.stop()
         
         # Stop the site
         if self.site:

@@ -68,15 +68,22 @@ class TCPConnection:
             # Read messages
             while not self.closed:
                 try:
-                    # Read data with timeout
-                    data = await asyncio.wait_for(
-                        self.reader.read(4096),
-                        timeout=300.0  # 5 minute timeout
-                    )
+                    # Read data with timeout (0 = no timeout)
+                    timeout = 3600.0  # 1 hour timeout (was 5 minutes)
+                    if timeout > 0:
+                        data = await asyncio.wait_for(
+                            self.reader.read(4096),
+                            timeout=timeout
+                        )
+                    else:
+                        data = await self.reader.read(4096)
                     
                     if not data:
                         # Connection closed
                         break
+                    
+                    # Log raw data for debugging
+                    logger.debug(f"Raw data from {self.remote_address}: {data[:100]}")
                     
                     # Add to buffer
                     self.buffer += data.decode('utf-8', errors='ignore')

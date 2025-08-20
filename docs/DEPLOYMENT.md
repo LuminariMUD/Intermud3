@@ -49,8 +49,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Copy configuration
-cp config/config.yaml.example config/config.yaml
 cp .env.example .env
+# Edit .env to set your MUD name and other settings
 ```
 
 ### Method 2: Using pip (Future)
@@ -192,7 +192,7 @@ security:
 # Activate virtual environment
 source venv/bin/activate
 
-# Run with default config
+# Run with default config (uses .env and config/config.yaml)
 python -m src
 
 # Run with specific config
@@ -435,14 +435,22 @@ spec:
 ### Health Check Endpoints
 
 ```bash
-# TCP health check
-nc -zv localhost 4001
-
-# HTTP health check (if enabled)
+# HTTP health check
 curl http://localhost:8080/health
+
+# Expected response:
+# {
+#   "status": "healthy",
+#   "service": "i3-gateway-api",
+#   "websocket_connections": 0,
+#   "active_sessions": 0
+# }
 
 # Metrics endpoint
 curl http://localhost:8080/metrics
+
+# TCP health check (if TCP API enabled)
+nc -zv localhost 8081
 ```
 
 ### Logging
