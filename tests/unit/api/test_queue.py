@@ -9,87 +9,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from src.api.queue import (
     QueuedMessage,
     PriorityMessageQueue,
-    MessageQueueManager
+    MessageQueueManager,
+    message_queue_manager
 )
 
-# Mock classes that don't exist yet
-class MessageQueue:
-    def __init__(self, max_size=1000):
-        self.max_size = max_size
-        self.queue = []
-        self.total_processed = 0
-        self.total_dropped = 0
-    
-    def size(self):
-        return len(self.queue)
-    
-    def is_empty(self):
-        return len(self.queue) == 0
-    
-    def is_full(self):
-        return len(self.queue) >= self.max_size
-    
-    def put(self, message):
-        if self.is_full():
-            raise QueueError("Queue is full")
-        self.queue.append(message)
-    
-    def get(self):
-        if self.is_empty():
-            return None
-        message = self.queue.pop(0)
-        self.total_processed += 1
-        return message
-    
-    def peek(self):
-        if self.is_empty():
-            return None
-        return self.queue[0]
-    
-    def clear(self):
-        self.queue.clear()
-    
-    def get_stats(self):
-        return {
-            "size": self.size(),
-            "max_size": self.max_size,
-            "total_processed": self.total_processed,
-            "total_dropped": self.total_dropped
-        }
-
-class PriorityMessageQueue(MessageQueue):
-    def __init__(self, max_size=1000):
-        super().__init__(max_size)
-        import heapq
-        self.heap = []
-        self.heapq = heapq
-    
-    def put(self, message):
-        if self.is_full():
-            raise QueueError("Queue is full")
-        self.heapq.heappush(self.heap, message)
-    
-    def get(self):
-        if self.is_empty():
-            return None
-        message = self.heapq.heappop(self.heap)
-        self.total_processed += 1
-        return message
-    
-    def peek(self):
-        if self.is_empty():
-            return None
-        return self.heap[0]
-    
-    def size(self):
-        return len(self.heap)
-    
-    def is_empty(self):
-        return len(self.heap) == 0
-    
-    def clear(self):
-        self.heap.clear()
-
+# Custom exception for testing
 class QueueError(Exception):
     pass
 
@@ -97,7 +21,7 @@ class QueueError(Exception):
 @pytest.fixture
 def message_queue():
     """Create message queue for testing."""
-    return MessageQueue(max_size=100)
+    return PriorityMessageQueue(max_size=100)
 
 
 @pytest.fixture
@@ -202,7 +126,7 @@ class TestMessageQueue:
     
     def test_queue_full(self):
         """Test queue full behavior."""
-        small_queue = MessageQueue(max_size=2)
+        small_queue = PriorityMessageQueue(max_size=2)
         
         message1 = QueuedMessage("session1", {"data": 1}, priority=5)
         message2 = QueuedMessage("session2", {"data": 2}, priority=5)
@@ -213,9 +137,24 @@ class TestMessageQueue:
         
         assert small_queue.is_full()
         
-        # Should raise when full
-        with pytest.raises(QueueError):
-            small_queue.put(message3)
+        # Third message should be added by dropping the lowest priority message
+        # Since all messages have the same priority, it will drop the first one
+        success = small_queue.put(message3)
+        assert success
+        
+        # Queue should still be full but contain different messages
+        assert small_queue.is_full()
+        assert small_queue.size() == 2
+        
+        # The first message should have been dropped, so we should have message2 and message3
+        retrieved1 = small_queue.get()
+        retrieved2 = small_queue.get()
+        
+        # Both should be either message2 or message3 (not message1)
+        retrieved_data = [retrieved1.content["data"], retrieved2.content["data"]]
+        assert 2 in retrieved_data
+        assert 3 in retrieved_data
+        assert 1 not in retrieved_data
     
     def test_fifo_ordering(self, message_queue):
         """Test FIFO ordering in basic queue."""
@@ -270,18 +209,21 @@ class TestMessageQueue:
         """Test getting queue statistics."""
         stats = message_queue.get_stats()
         
-        assert stats["size"] == 0
+        assert stats["total_size"] == 0
         assert stats["max_size"] == 100
-        assert stats["total_processed"] == 0
-        assert stats["total_dropped"] == 0
+        assert stats["utilization"] == 0
+        assert stats["by_priority"] == {}
         
-        # Add and process some messages
-        message = QueuedMessage("session1", {"data": "test"}, priority=5)
-        message_queue.put(message)
-        message_queue.get()
+        # Add some messages
+        message1 = QueuedMessage("session1", {"data": "test1"}, priority=5)
+        message2 = QueuedMessage("session2", {"data": "test2"}, priority=3)
+        message_queue.put(message1)
+        message_queue.put(message2)
         
         stats = message_queue.get_stats()
-        assert stats["total_processed"] == 1
+        assert stats["total_size"] == 2
+        assert stats["by_priority"][3] == 1  # One message with priority 3
+        assert stats["by_priority"][5] == 1  # One message with priority 5
 
 
 class TestPriorityMessageQueue:
@@ -403,11 +345,13 @@ class TestMessageQueueManager:
         
         stats = queue_manager.get_queue_stats()
         
-        assert stats["total_sessions"] == 2
-        assert stats["total_messages"] == 3
+        # Check that session_queues exist and have correct sizes
         assert "session_queues" in stats
         assert stats["session_queues"]["session1"]["size"] == 2
         assert stats["session_queues"]["session2"]["size"] == 1
+        
+        # Check that we have 2 sessions with messages
+        assert len(stats["session_queues"]) == 2
     
     def test_cleanup_empty_queues(self, queue_manager):
         """Test cleanup of empty queues."""

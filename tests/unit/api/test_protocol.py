@@ -54,6 +54,7 @@ class TestJSONRPCRequest:
     def test_request_creation(self):
         """Test creating a JSON-RPC request."""
         request = JSONRPCRequest(
+            jsonrpc="2.0",
             method="tell",
             params={"target_user": "alice", "message": "hello"},
             id="123"
@@ -105,29 +106,30 @@ class TestJSONRPCResponse:
     
     def test_error_response(self):
         """Test creating an error response."""
-        error = JSONRPCError(
-            code=-32600,
-            message="Invalid Request",
-            data={"extra": "info"}
-        )
+        error = {
+            "code": JSONRPCError.INVALID_REQUEST,
+            "message": "Invalid Request",
+            "data": {"extra": "info"}
+        }
         response = JSONRPCResponse(
             error=error,
             id="123"
         )
         
         assert response.result is None
-        assert response.error.code == -32600
-        assert response.error.message == "Invalid Request"
+        assert response.error["code"] == JSONRPCError.INVALID_REQUEST
+        assert response.error["message"] == "Invalid Request"
         assert response.id == "123"
     
     def test_response_to_dict(self):
-        """Test converting response to dictionary."""
+        """Test converting response to JSON."""
         response = JSONRPCResponse(
             result={"status": "sent"},
             id="123"
         )
         
-        data = response.to_dict()
+        json_str = response.to_json()
+        data = json.loads(json_str)
         
         assert data["jsonrpc"] == "2.0"
         assert data["result"]["status"] == "sent"

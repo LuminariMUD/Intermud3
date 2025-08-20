@@ -276,10 +276,16 @@ class TestAPIServer:
     @pytest.mark.asyncio
     async def test_status_handler(self, server):
         """Test status handler."""
+        from datetime import datetime
+        
         mock_session = MagicMock(spec=Session)
         mock_session.mud_name = "TestMUD"
         mock_session.session_id = "test-session-123"
-        mock_session.connected_at.timestamp.return_value = 1000.0
+        
+        # Mock connected_at as a datetime object with timestamp method
+        mock_connected_at = MagicMock(spec=datetime)
+        mock_connected_at.timestamp.return_value = 1000.0
+        mock_session.connected_at = mock_connected_at
         
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_loop.return_value.time.return_value = 2000.0
@@ -295,9 +301,20 @@ class TestAPIServer:
     async def test_cleanup_sessions_task(self, server):
         """Test session cleanup background task."""
         server.session_manager.cleanup_expired = AsyncMock()
-        server._shutdown_event.set()  # Stop the loop immediately
         
-        await server._cleanup_sessions()
+        # Run the cleanup task for a short time then stop
+        import asyncio
+        async def stop_after_short_delay():
+            await asyncio.sleep(0.01)  # Small delay to let cleanup run once
+            server._shutdown_event.set()
+        
+        # Start both tasks concurrently
+        stop_task = asyncio.create_task(stop_after_short_delay())
+        cleanup_task = asyncio.create_task(server._cleanup_sessions())
+        
+        # Wait for both to complete
+        await stop_task
+        await cleanup_task
         
         # Should have called cleanup at least once
         server.session_manager.cleanup_expired.assert_called()
@@ -307,14 +324,28 @@ class TestAPIServer:
         """Test WebSocket ping background task."""
         mock_ws1 = MockWebSocket()
         mock_ws2 = MockWebSocket()
-        mock_ws2.closed = True  # This one will fail ping
         
         server._websockets.add(mock_ws1)
         server._websockets.add(mock_ws2)
         
-        server._shutdown_event.set()  # Stop the loop immediately
+        # Make mock_ws2 raise an exception when pinged (to simulate disconnected websocket)
+        async def failing_ping():
+            raise ConnectionError("WebSocket closed")
+        mock_ws2.ping = failing_ping
         
-        await server._ping_websockets()
+        # Run the ping task for a short time then stop
+        import asyncio
+        async def stop_after_short_delay():
+            await asyncio.sleep(0.01)  # Small delay to let ping run once
+            server._shutdown_event.set()
+        
+        # Start both tasks concurrently
+        stop_task = asyncio.create_task(stop_after_short_delay())
+        ping_task = asyncio.create_task(server._ping_websockets())
+        
+        # Wait for both to complete
+        await stop_task
+        await ping_task
         
         # Working WebSocket should remain
         assert mock_ws1 in server._websockets
@@ -330,9 +361,20 @@ class TestAPIServer:
         mock_session.flush_queue = AsyncMock()
         
         server.session_manager.get_all_sessions = MagicMock(return_value=[mock_session])
-        server._shutdown_event.set()  # Stop the loop immediately
         
-        await server._process_event_queues()
+        # Run the event queue processing task for a short time then stop
+        import asyncio
+        async def stop_after_short_delay():
+            await asyncio.sleep(0.01)  # Small delay to let processing run once
+            server._shutdown_event.set()
+        
+        # Start both tasks concurrently
+        stop_task = asyncio.create_task(stop_after_short_delay())
+        process_task = asyncio.create_task(server._process_event_queues())
+        
+        # Wait for both to complete
+        await stop_task
+        await process_task
         
         # Should have called flush_queue
         mock_session.flush_queue.assert_called()
@@ -417,30 +459,53 @@ class TestAPIServer:
 class TestAPIServerIntegration(AioHTTPTestCase):
     """Integration tests for API server."""
     
+    def setUp(self):
+        """Set up test patches."""
+        super().setUp()
+        # Start patches
+        self.event_dispatcher_patch = patch('src.api.server.event_dispatcher')
+        self.message_queue_patch = patch('src.api.server.message_queue_manager')
+        self.event_bridge_patch = patch('src.api.server.event_bridge')
+        
+        self.mock_dispatcher = self.event_dispatcher_patch.start()
+        self.mock_queue = self.message_queue_patch.start()
+        self.mock_bridge = self.event_bridge_patch.start()
+        
+        # Configure async mocks
+        self.mock_dispatcher.start = AsyncMock()
+        self.mock_dispatcher.stop = AsyncMock()
+        self.mock_queue.start = AsyncMock()
+        self.mock_queue.stop = AsyncMock()
+        self.mock_bridge.start = MagicMock()
+        self.mock_bridge.stop = MagicMock()
+    
     async def get_application(self):
         """Create application for testing."""
         config = APIConfig(
             host="127.0.0.1",
-            port=8080,
+            port=0,  # Use port 0 to get a random available port
             websocket=WebSocketConfig(enabled=True)
         )
         
         self.server = APIServer(config)
+        # Mock session manager for endpoint tests
+        self.server.session_manager.get_active_count = MagicMock(return_value=3)
         
-        # Mock event system components
-        with patch('src.api.server.event_dispatcher'), \
-             patch('src.api.server.message_queue_manager'), \
-             patch('src.api.server.event_bridge'):
-            
-            await self.server.start()
-            return self.server.app
+        # Just return the app, don't start the full server
+        self.server.app = web.Application()
+        self.server._setup_routes()
+        self.server._setup_middleware()
+        return self.server.app
     
-    async def tearDown(self):
+    def tearDown(self):
         """Clean up after tests."""
-        await self.server.stop()
-        await super().tearDown()
+        # Stop patches
+        self.event_dispatcher_patch.stop()
+        self.message_queue_patch.stop()
+        self.event_bridge_patch.stop()
+        
+        super().tearDown()
     
-    @unittest_run_loop
     async def test_health_endpoint_integration(self):
         """Test health endpoint integration."""
         resp = await self.client.request("GET", "/health")
@@ -449,7 +514,6 @@ class TestAPIServerIntegration(AioHTTPTestCase):
         data = await resp.json()
         assert data["status"] == "healthy"
     
-    @unittest_run_loop
     async def test_liveness_endpoint_integration(self):
         """Test liveness endpoint integration."""
         resp = await self.client.request("GET", "/health/live")
@@ -458,7 +522,6 @@ class TestAPIServerIntegration(AioHTTPTestCase):
         data = await resp.json()
         assert data["status"] == "alive"
     
-    @unittest_run_loop
     async def test_metrics_endpoint_integration(self):
         """Test metrics endpoint integration."""
         resp = await self.client.request("GET", "/metrics")

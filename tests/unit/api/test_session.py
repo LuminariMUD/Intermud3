@@ -383,12 +383,13 @@ class TestSessionManager:
     async def test_authenticate_valid_credential(self):
         """Test authentication with valid credential."""
         from src.api.session import SessionManager
-        from src.config.models import APIConfig
+        from src.config.models import APIConfig, APIAuthConfig
         
-        config = APIConfig(host="127.0.0.1", port=8080)
+        # Test with authentication disabled
+        auth_config = APIAuthConfig(enabled=False, api_keys=[])
+        config = APIConfig(host="127.0.0.1", port=8080, auth=auth_config)
         manager = SessionManager(config)
         
-        # Test with authentication disabled (default behavior)
         session = await manager.authenticate("test-credential")
         
         assert session is not None

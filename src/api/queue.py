@@ -261,6 +261,7 @@ class MessageQueueManager:
         # Worker task management
         self.running = False
         self.worker_task: Optional[asyncio.Task] = None
+        self.process_task: Optional[asyncio.Task] = None
         
         # Statistics
         self.stats = {
@@ -282,6 +283,7 @@ class MessageQueueManager:
         
         self.running = True
         self.worker_task = asyncio.create_task(self._cleanup_loop())
+        self.process_task = asyncio.create_task(self._process_loop())
         logger.info("Message queue manager started")
     
     async def stop(self):
@@ -295,6 +297,14 @@ class MessageQueueManager:
             except asyncio.CancelledError:
                 pass
             self.worker_task = None
+            
+        if self.process_task:
+            self.process_task.cancel()
+            try:
+                await self.process_task
+            except asyncio.CancelledError:
+                pass
+            self.process_task = None
         
         logger.info("Message queue manager stopped")
     
@@ -306,6 +316,15 @@ class MessageQueueManager:
                 self._cleanup_all_queues()
             except Exception as e:
                 logger.error(f"Error in cleanup loop: {e}")
+    
+    async def _process_loop(self):
+        """Periodic processing of message queues."""
+        while self.running:
+            try:
+                await self.process_queues()
+                await asyncio.sleep(0.1)  # Process queues frequently
+            except Exception as e:
+                logger.error(f"Error in process loop: {e}")
     
     def get_or_create_queue(self, session_id: str) -> PriorityMessageQueue:
         """Get or create a queue for a session.
@@ -470,14 +489,21 @@ class MessageQueueManager:
         # Import here to avoid circular imports
         from src.api.session import session_manager
         
-        for session_id, queue in self.session_queues.items():
+        # Make a copy of the keys to avoid dictionary changed size during iteration
+        session_ids = list(self.session_queues.keys())
+        disconnected_sessions = []
+        
+        for session_id in session_ids:
+            if session_id not in self.session_queues:
+                continue
+                
+            queue = self.session_queues[session_id]
             session = session_manager.get_session(session_id) if session_manager else None
             
             # Skip if session doesn't exist or isn't connected
             if not session or not session.is_connected():
-                # Clean up queue for disconnected session
-                if session_id in self.session_queues:
-                    del self.session_queues[session_id]
+                # Mark for cleanup later
+                disconnected_sessions.append(session_id)
                 continue
             
             while queue.size() > 0:
@@ -499,6 +525,11 @@ class MessageQueueManager:
                             self.add_retry_message(session_id, queued_msg)
                         else:
                             self.stats["messages_dropped"] += 1
+        
+        # Clean up queues for disconnected sessions
+        for session_id in disconnected_sessions:
+            if session_id in self.session_queues:
+                del self.session_queues[session_id]
     
     def get_all_messages(self, session_id: str, limit: int = 100) -> List[str]:
         """Get all queued messages for session.

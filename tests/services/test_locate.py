@@ -835,3 +835,18 @@ class TestEdgeCases:
         
         result = await locate_service._search_local_user("anyone")
         assert result is None
+    
+    async def test_validate_empty_user_to_locate(self, locate_service):
+        """Test validation with empty user_to_locate."""
+        packet = LocatePacket(
+            packet_type=PacketType.LOCATE_REQ,
+            ttl=200,
+            originator_mud="RemoteMUD",
+            originator_user="requester",
+            target_mud="TestMUD",
+            target_user="",
+            user_to_locate=""  # Empty user to locate
+        )
+        
+        result = await locate_service.validate_packet(packet)
+        assert result is False

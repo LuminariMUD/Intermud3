@@ -535,3 +535,18 @@ class TestEdgeCases:
         
         history = tell_service.get_tell_history("receiver")
         assert history[0]["timestamp"] == 12345.678
+    
+    async def test_validate_packet_edge_cases(self, tell_service):
+        """Test validation edge cases."""
+        # Test with wrong packet class but supported type
+        packet = Mock()
+        packet.packet_type = PacketType.TELL
+        packet.originator_user = "test"
+        packet.target_user = "test"
+        
+        # Should fail because it's not a TellPacket instance
+        assert await tell_service.validate_packet(packet) is False
+        
+        # Test with EMOTETO type but wrong class
+        packet.packet_type = PacketType.EMOTETO
+        assert await tell_service.validate_packet(packet) is False

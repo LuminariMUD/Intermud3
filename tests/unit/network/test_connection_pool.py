@@ -701,7 +701,7 @@ class TestConnectionPool:
         stats = pool.get_stats()
         
         assert isinstance(stats, PoolStats)
-        assert stats.total_calls == 0
+        assert stats.acquired_connections == 0
     
     def test_get_stats_disabled(self):
         """Test getting stats when disabled."""

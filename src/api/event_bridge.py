@@ -60,7 +60,7 @@ class EventBridge:
                 await self._process_tell(packet)
             elif packet.packet_type == PacketType.EMOTETO:
                 await self._process_emoteto(packet)
-            elif packet.packet_type == PacketType.CHANNEL_MESSAGE:
+            elif packet.packet_type == PacketType.CHANNEL_M:
                 await self._process_channel_message(packet)
             elif packet.packet_type == PacketType.CHANNEL_E:
                 await self._process_channel_emote(packet)

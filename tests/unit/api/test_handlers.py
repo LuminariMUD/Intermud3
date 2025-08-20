@@ -98,13 +98,17 @@ class ChannelHandler(BaseHandler):
     async def channel_listen(self, session, params):
         self.validate_permission(session, "channel")
         self.validate_params(params, ["channel"])
-        # Mock implementation
+        # Mock implementation with subscription manager call
+        from src.api.subscriptions import subscription_manager
+        subscription_manager.add_subscription(session.session_id, "channel", params["channel"])
         return {"status": "subscribed", "channel": params["channel"]}
     
     async def channel_unlisten(self, session, params):
         self.validate_permission(session, "channel")
         self.validate_params(params, ["channel"])
-        # Mock implementation
+        # Mock implementation with subscription manager call
+        from src.api.subscriptions import subscription_manager
+        subscription_manager.remove_subscription(session.session_id, "channel", params["channel"])
         return {"status": "unsubscribed", "channel": params["channel"]}
     
     async def channel_who(self, session, params):
@@ -162,7 +166,7 @@ def mock_session():
     session_data = {
         "session_id": "test-session-1",
         "mud_name": "TestMUD",
-        "permissions": {"tell", "channel", "who", "finger", "admin"}
+        "permissions": {"tell", "channel", "who", "finger", "locate", "admin"}
     }
     session_data["api_key"] = "test-credential"
     
@@ -619,8 +623,8 @@ class TestHandlerIntegration:
         """Test that handlers handle errors consistently."""
         handler = CommunicationHandler(mock_gateway)
         
-        # Test permission error
-        mock_session.has_permission.return_value = False
+        # Test permission error - modify session to not have tell permission
+        mock_session.has_permission = MagicMock(side_effect=lambda perm: perm != "tell")
         
         with pytest.raises(Exception):
             await handler.tell(mock_session, {
@@ -630,7 +634,7 @@ class TestHandlerIntegration:
             })
         
         # Test parameter validation error
-        mock_session.has_permission.return_value = True
+        mock_session.has_permission = MagicMock(return_value=True)
         
         with pytest.raises(ValueError):
             await handler.tell(mock_session, {
