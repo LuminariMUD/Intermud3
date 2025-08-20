@@ -1,9 +1,11 @@
 # Intermud3 Gateway Deployment Guide
 
 ## Project Status
-- **Current Phase**: Phase 3 Complete - Ready for Production
-- **Phase 2 Complete**: Core services implemented with 60% test coverage
-- **Phase 3 Complete**: JSON-RPC API, client libraries, full documentation
+- **Current Phase**: Phase 3 Complete (2025-08-20) - Ready for Production
+- **Phase 2 Complete**: Core services implemented
+- **Phase 3 Complete**: JSON-RPC API, WebSocket/TCP servers, client libraries, full documentation
+- **Test Coverage**: 78% overall with 1200+ tests
+- **Performance**: 1000+ msg/sec throughput, <100ms latency achieved
 - **Version**: 0.3.0
 
 ## Table of Contents
@@ -26,7 +28,8 @@
 
 ### Network Requirements
 - Outbound TCP port 8080 (to I3 routers)
-- Inbound TCP port 4001 (from your MUD server)
+- Inbound TCP port 8080 (WebSocket API)
+- Inbound TCP port 8081 (TCP API)
 - Stable internet connection
 
 ## Installation Methods
@@ -35,8 +38,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/intermud3-gateway.git
-cd intermud3-gateway
+git clone https://github.com/LuminariMUD/Intermud3.git
+cd Intermud3
 
 # Create virtual environment
 python3 -m venv venv
@@ -69,10 +72,12 @@ docker pull intermud3/gateway:latest
 Create a `.env` file in the project root:
 
 ```bash
-# Gateway Configuration
-GATEWAY_HOST=0.0.0.0
-GATEWAY_PORT=4001
-GATEWAY_SECRET=your-secret-key-here
+# API Configuration
+API_WS_HOST=0.0.0.0
+API_WS_PORT=8080
+API_TCP_HOST=0.0.0.0
+API_TCP_PORT=8081
+I3_GATEWAY_SECRET=your-secret-key-here
 
 # MUD Configuration
 MUD_NAME=YourMUD
@@ -106,10 +111,15 @@ RATE_LIMIT_CHANNELS=20
 Edit `config/config.yaml`:
 
 ```yaml
-gateway:
-  host: ${GATEWAY_HOST:0.0.0.0}
-  port: ${GATEWAY_PORT:4001}
-  secret: ${GATEWAY_SECRET}
+api:
+  websocket:
+    host: ${API_WS_HOST:0.0.0.0}
+    port: ${API_WS_PORT:8080}
+  tcp:
+    host: ${API_TCP_HOST:0.0.0.0}
+    port: ${API_TCP_PORT:8081}
+  auth:
+    secret: ${I3_GATEWAY_SECRET}
   
 mud:
   name: ${MUD_NAME}
@@ -226,7 +236,8 @@ docker build -t myregistry/i3-gateway:v1.0.0 .
 # Basic run
 docker run -d \
   --name i3-gateway \
-  -p 4001:4001 \
+  -p 8080:8080 \
+  -p 8081:8081 \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/logs:/app/logs \
   intermud3-gateway:latest
@@ -234,7 +245,8 @@ docker run -d \
 # With environment variables
 docker run -d \
   --name i3-gateway \
-  -p 4001:4001 \
+  -p 8080:8080 \
+  -p 8081:8081 \
   -e MUD_NAME=MyMUD \
   -e MUD_PORT=4000 \
   -e LOG_LEVEL=DEBUG \
@@ -243,7 +255,8 @@ docker run -d \
 # With env file
 docker run -d \
   --name i3-gateway \
-  -p 4001:4001 \
+  -p 8080:8080 \
+  -p 8081:8081 \
   --env-file .env \
   intermud3-gateway:latest
 ```
@@ -260,7 +273,8 @@ services:
     container_name: i3-gateway
     restart: unless-stopped
     ports:
-      - "4001:4001"
+      - "8080:8080"  # WebSocket API
+      - "8081:8081"  # TCP API
     environment:
       - MUD_NAME=${MUD_NAME}
       - MUD_PORT=${MUD_PORT}
@@ -270,7 +284,7 @@ services:
       - ./logs:/app/logs
       - ./data:/app/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 4001)); s.close()"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

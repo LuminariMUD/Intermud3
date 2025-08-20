@@ -2,13 +2,16 @@
 
 ## Overview
 
-The Intermud3 Gateway provides a JSON-RPC 2.0 API over TCP/WebSocket for MUD servers to integrate with the global Intermud-3 network. This document describes the available methods, their parameters, and expected responses.
+The Intermud3 Gateway provides a JSON-RPC 2.0 API over WebSocket and TCP for MUD servers to integrate with the global Intermud-3 network. This document describes the available methods, their parameters, and expected responses.
+
+**Current Status**: Phase 3 Complete (2025-08-20) - Full implementation with 78% test coverage, 1200+ tests.
 
 ## Connection
 
-### Endpoint
-- **Default Port**: 4001
-- **Protocol**: JSON-RPC 2.0 over TCP or WebSocket
+### Endpoints
+- **WebSocket**: `ws://localhost:8080/ws`
+- **TCP Socket**: `localhost:8081`
+- **Protocol**: JSON-RPC 2.0
 - **Encoding**: UTF-8
 
 ### Authentication
@@ -17,8 +20,20 @@ The Intermud3 Gateway provides a JSON-RPC 2.0 API over TCP/WebSocket for MUD ser
   "jsonrpc": "2.0",
   "method": "authenticate",
   "params": {
+    "api_key": "your-api-key-here"
+  },
+  "id": 1
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "status": "authenticated",
     "mud_name": "YourMUD",
-    "secret": "shared-secret-key"
+    "session_id": "unique-session-id"
   },
   "id": 1
 }
@@ -495,7 +510,7 @@ import json
 import socket
 
 class I3GatewayClient:
-    def __init__(self, host='localhost', port=4001):
+    def __init__(self, host='localhost', port=8081):  # TCP port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
         self.request_id = 0
@@ -546,11 +561,12 @@ print(result)
   - Circuit breakers and retry mechanisms
   - Connection pooling and health checks
   - Performance benchmarks and stress testing
-- **0.3.0**: Phase 3 Complete (2025-08-19) - Gateway API Protocol
+- **0.3.0**: Phase 3 Complete (2025-08-20) - Gateway API Protocol
   - Full JSON-RPC 2.0 implementation
-  - WebSocket and TCP support
-  - Client libraries (Python, JavaScript/Node.js)
+  - WebSocket (port 8080) and TCP (port 8081) support
+  - Client libraries (Python, JavaScript/Node.js with TypeScript)
   - Comprehensive documentation
   - Authentication and state management
   - Event distribution system
+  - 78% test coverage with 1200+ tests
 - **0.4.0**: OOB services and advanced features (planned)

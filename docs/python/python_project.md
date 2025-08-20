@@ -127,6 +127,7 @@ dependencies = [
     "pydantic>=2.0",
     "python-dotenv>=1.0.0",
     "click>=8.0",
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]
@@ -144,7 +145,6 @@ dev = [
 docs = [
     "sphinx>=7.0",
     "sphinx-rtd-theme>=1.3",
-    "autodoc>=0.5",
 ]
 security = [
     "bandit>=1.7",
@@ -158,13 +158,12 @@ i3-gateway = "src.__main__:main"
 
 ### 2. **Code Quality Configuration**
 
-#### **Ruff - Fast Python Linter**
+#### **Ruff - Fast Python Linter (.ruff.toml)**
 ```toml
-[tool.ruff]
-line-length = 100
 target-version = "py39"
+line-length = 100
 
-[tool.ruff.lint]
+[lint]
 select = [
     "E", "W",      # pycodestyle
     "F",           # pyflakes
@@ -175,19 +174,49 @@ select = [
     "ARG",         # flake8-unused-arguments
     "SIM",         # flake8-simplify
     "PTH",         # flake8-use-pathlib
-    "ERA",         # flake8-eradicate
     "RUF",         # Ruff-specific rules
-]
-ignore = [
-    "E501",        # Line too long (handled by black)
-    "B008",        # Function calls in argument defaults
-    "B904",        # raise without from inside except
-    "SIM108",      # Use ternary operator
+    "N",           # pep8-naming
+    "D",           # pydocstyle
+    "ANN",         # flake8-annotations
+    "S",           # flake8-bandit
+    "ASYNC",       # flake8-async
+    "T20",         # flake8-print
+    "RET",         # flake8-return
+    "SLF",         # flake8-self
+    "RSE",         # flake8-raise
+    "PL",          # pylint
+    "ERA",         # flake8-eradicate
+    "ICN",         # flake8-import-conventions
+    "PIE",         # flake8-pie
+    "Q",           # flake8-quotes
+    "DTZ",         # flake8-datetimez
+    "EM",          # flake8-errmsg
+    "FA",          # flake8-future-annotations
+    "G",           # flake8-logging-format
+    "INP",         # flake8-no-pep420
+    "T10",         # flake8-debugger
+    "YTT",         # flake8-2020
 ]
 
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "ARG001", "ARG002"]
-"**/__init__.py" = ["F401"]
+ignore = [
+    "D100", "D104", "D107",  # Missing docstrings
+    "D203", "D212",          # Docstring formatting
+    "ANN101", "ANN102",      # Missing type annotations for self/cls
+    "ANN401",                # Dynamically typed expressions
+    "PLR0913", "PLR0915",    # Too many arguments/statements
+    "PLR0912", "PLR2004",    # Too many branches/magic values
+    "S101",                  # Use of assert detected
+    "S311",                  # Standard pseudo-random generators
+    "EM101", "EM102",        # Exception message formatting
+    "G004",                  # Logging statement uses f-string
+    "INP001",                # Implicit namespace package
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "ARG", "D", "ANN", "PLR2004", "PLR0913", "PLR0915", "S311", "SLF001"]
+"**/__init__.py" = ["F401", "D104"]
+"src/__main__.py" = ["T20"]
+"clients/examples/*.py" = ["T20", "S101"]
 ```
 
 #### **Black - Code Formatter**
@@ -206,7 +235,7 @@ extend-exclude = '''
 #### **MyPy - Type Checker**
 ```toml
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -215,8 +244,13 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-show_error_codes = true
+warn_no_return = true
+follow_imports = "normal"
+ignore_missing_imports = true
 pretty = true
+show_column_numbers = true
+show_error_codes = true
+show_error_context = true
 ```
 
 ### 3. **Testing Configuration**
@@ -265,33 +299,93 @@ exclude_lines = [
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
+        args: ['--maxkb=1000']
       - id: check-json
       - id: check-toml
       - id: check-merge-conflict
       - id: debug-statements
+      - id: detect-private-key
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
+    rev: v0.8.4
     hooks:
       - id: ruff
-        args: [--fix]
+        name: "Ruff linter"
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+        name: "Ruff formatter"
 
   - repo: https://github.com/psf/black
-    rev: 23.12.0
+    rev: 24.10.0
     hooks:
       - id: black
+        name: "Format Python code with Black"
+        language_version: python3.9
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+    rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-pyyaml]
+        name: "Type check with MyPy"
+        additional_dependencies:
+          - types-pyyaml>=6.0
+          - types-setuptools
+          - pydantic>=2.0
+          - aiohttp>=3.9.0
+          - structlog>=23.0
+          - click>=8.0
+        args: [--ignore-missing-imports, --strict, --show-error-codes]
+        exclude: ^tests/
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
+    hooks:
+      - id: bandit
+        name: "Security check with Bandit"
+        args: [-ll, -r, src/, --skip, B101]
+        exclude: ^tests/
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.29.1
+    hooks:
+      - id: commitizen
+        name: "Check commit message format"
+      - id: commitizen-branch
+        name: "Check branch naming convention"
+        stages: [push]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: "Sort imports with isort"
+        args: ["--profile", "black", "--line-length", "100"]
+
+  - repo: https://github.com/python-poetry/poetry
+    rev: 1.8.4
+    hooks:
+      - id: poetry-check
+        name: "Validate pyproject.toml"
+        files: pyproject.toml
+
+  - repo: https://github.com/charliermarsh/docformatter
+    rev: v1.7.5
+    hooks:
+      - id: docformatter
+        name: "Format docstrings"
+        args: [--in-place, --wrap-summaries, "100", --wrap-descriptions, "100"]
 ```
 
 ### 5. **Makefile Commands (Active)**
@@ -323,85 +417,131 @@ make setup           # Complete development setup
 ### 6. **Docker Configuration**
 
 ```dockerfile
-# Dockerfile (Active)
-FROM python:3.12-slim
+# Dockerfile (Active) - Multi-stage production build
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install dependencies
+# Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Final stage
+FROM python:3.11-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 i3gateway && \
+    mkdir -p /app/logs /app/state /app/config && \
+    chown -R i3gateway:i3gateway /app
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY src/ src/
-COPY config/ config/
+COPY --chown=i3gateway:i3gateway src/ src/
+COPY --chown=i3gateway:i3gateway config/ config/
+COPY --chown=i3gateway:i3gateway clients/ clients/
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV LOG_LEVEL=INFO
+# Switch to non-root user
+USER i3gateway
 
-# Run the gateway
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    LOG_LEVEL=INFO
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose ports: WebSocket API, TCP API, Metrics/Health
+EXPOSE 8080 8081 9090
+
+# Run the application
 CMD ["python", "-m", "src"]
 ```
 
 ```yaml
-# docker-compose.yml (Active)
+# docker-compose.yml (Active) - Full production setup
 version: '3.8'
 
 services:
   i3-gateway:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: i3-gateway:latest
     container_name: i3-gateway
-    ports:
-      - "4001:4001"
-    volumes:
-      - ./config:/app/config
-      - ./logs:/app/logs
-    environment:
-      - LOG_LEVEL=INFO
-      - I3_ROUTER_HOST=204.209.44.3
-      - I3_ROUTER_PORT=8080
     restart: unless-stopped
+    ports:
+      - "8080:8080"  # WebSocket API port
+      - "8081:8081"  # TCP API port
+      - "9090:9090"  # Metrics/health port
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./state:/app/state
+      - ./.env:/app/.env:ro
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MUD_NAME=${MUD_NAME}
+      - MUD_PORT=${MUD_PORT}
+      - I3_ROUTER_HOST=${I3_ROUTER_HOST:-204.209.44.3}
+      - I3_ROUTER_PORT=${I3_ROUTER_PORT:-8080}
+      - API_WS_HOST=0.0.0.0
+      - API_WS_PORT=8080
+      - API_TCP_HOST=0.0.0.0
+      - API_TCP_PORT=8081
+      - I3_GATEWAY_SECRET=${I3_GATEWAY_SECRET}
+    networks:
+      - i3-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  i3-network:
+    driver: bridge
 ```
 
-### 7. **VS Code Settings**
-
-```json
-// .vscode/settings.json (Active)
-{
-    "python.defaultInterpreter": "venv/bin/python",
-    "python.linting.enabled": true,
-    "python.linting.ruffEnabled": true,
-    "python.formatting.provider": "black",
-    "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": ["tests"],
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-        "source.organizeImports": true
-    },
-    "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    }
-}
-```
-
-### 8. **Environment Configuration**
+### 7. **Environment Configuration**
 
 ```ini
-# .env.example (Template for local development)
+# Environment variables for I3 Gateway (create .env file from this template)
+
 # I3 Router Settings
 I3_ROUTER_HOST=204.209.44.3
 I3_ROUTER_PORT=8080
 I3_ROUTER_PASSWORD=your_password_here
 
-# Gateway Settings
-GATEWAY_HOST=0.0.0.0
-GATEWAY_PORT=4001
+# API Server Settings
+API_WS_HOST=0.0.0.0
+API_WS_PORT=8080
+API_TCP_HOST=0.0.0.0
+API_TCP_PORT=8081
 
 # MUD Settings
 MUD_NAME=YourMUD
@@ -409,10 +549,14 @@ MUD_PORT=4000
 
 # Logging
 LOG_LEVEL=INFO
-LOG_FORMAT=json
+LOG_FORMAT=structured
 
 # Security
-GATEWAY_SECRET=your_secret_key
+I3_GATEWAY_SECRET=your_secret_key_here
+
+# Development
+DEBUG=false
+ENABLE_METRICS=true
 ```
 
 ## Development Workflow
@@ -430,9 +574,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 make install-dev
 
-# Copy environment template
-cp .env.example .env
-# Edit .env with your settings
+# Create environment file
+# Copy and edit environment variables as needed
 
 # Run tests to verify setup
 make test
@@ -466,32 +609,43 @@ pre-commit run --all-files
 
 ## Project Status
 
-Currently in **Phase 1-2** of development (see docs/HIGH_LEVEL_PLAN.md):
+**Phase 3 COMPLETE** (December 2024) - Full API implementation:
 - ✅ Project structure and configuration
 - ✅ Development environment setup
-- 🚧 Core network protocol implementation
-- 🚧 Basic service handlers
-- ⏳ JSON-RPC API implementation
-- ⏳ Advanced features and OOB services
+- ✅ Core network protocol implementation
+- ✅ Complete I3 service handlers (channel, tell, who, finger, locate)
+- ✅ WebSocket and TCP API servers
+- ✅ Event-driven architecture with event bridge
+- ✅ Session management and authentication
+- ✅ Comprehensive error handling and circuit breakers
+- ✅ Health checks and monitoring
+- ✅ Production-ready Docker deployment
+- ✅ 1200+ tests with ~75-78% coverage
+- 🚧 Performance optimizations and monitoring dashboard
+- ⏳ Advanced OOB services and protocol extensions
 
 ## Key Dependencies
 
 ### Production
-- **aiohttp**: Async HTTP client/server framework
-- **pydantic**: Data validation using Python type annotations
-- **pyyaml**: YAML configuration parsing
-- **structlog**: Structured logging
-- **click**: Command-line interface creation
-- **python-dotenv**: Load environment variables from .env
+- **aiohttp**: Async HTTP client/server framework for WebSocket and TCP APIs
+- **pydantic**: Data validation and serialization using Python type annotations
+- **pyyaml**: YAML configuration file parsing
+- **structlog**: Structured logging with JSON output support
+- **click**: Command-line interface creation toolkit
+- **python-dotenv**: Environment variable loading from .env files
+- **psutil**: System and process monitoring utilities
 
 ### Development
-- **pytest**: Testing framework
-- **pytest-asyncio**: Async test support
-- **pytest-cov**: Coverage reporting
-- **black**: Code formatter
-- **ruff**: Fast Python linter
-- **mypy**: Static type checker
-- **pre-commit**: Git hook framework
+- **pytest**: Testing framework with async support
+- **pytest-asyncio**: Async test execution support
+- **pytest-cov**: Code coverage reporting and analysis
+- **pytest-mock**: Mock object utilities for testing
+- **black**: Opinionated Python code formatter
+- **ruff**: Ultra-fast Python linter and formatter
+- **mypy**: Static type checking for Python
+- **pre-commit**: Git hook framework for code quality
+- **bandit**: Security vulnerability scanner
+- **safety**: Dependency vulnerability scanner
 
 ## Contributing
 

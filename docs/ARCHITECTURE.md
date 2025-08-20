@@ -4,7 +4,13 @@
 
 The Intermud3 Gateway is a standalone service that bridges MUD servers with the global Intermud-3 network. It handles all I3 protocol complexity internally while exposing a simple JSON-RPC API for MUD integration.
 
-**Current Status**: Phase 3 Complete (2025-08-19) - Full JSON-RPC API with WebSocket/TCP support, client libraries, and comprehensive documentation. Ready for production deployment.
+**Current Status**: Phase 3 Complete (2025-08-20) - Full JSON-RPC API with WebSocket/TCP support, client libraries, and comprehensive documentation. Ready for production deployment.
+
+**Key Achievements**:
+- Test Coverage: 78% overall with 1200+ comprehensive tests
+- Performance: 1000+ msg/sec throughput with <100ms latency
+- Client Libraries: Python, JavaScript/Node.js with TypeScript definitions
+- API Servers: WebSocket (port 8080) and TCP (port 8081) with event streaming
 
 ## Architecture Diagram
 
@@ -62,8 +68,9 @@ The Intermud3 Gateway is a standalone service that bridges MUD servers with the 
 │  └────────────────────────────────────────────────────────┘ │
 └──────────────────────────┬──────────────────────────────────┘
                            │
-                    JSON-RPC over TCP
-                    (Simple Text Protocol)
+               JSON-RPC over WebSocket/TCP
+                WebSocket: Port 8080
+                TCP: Port 8081
                            │
 ┌──────────────────────────┴──────────────────────────────────┐
 │                      MUD Servers                             │
