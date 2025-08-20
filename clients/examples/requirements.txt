@@ -1,0 +1,18 @@
+# Core I3 Gateway client requirements
+aiohttp>=3.8.0
+asyncio
+
+# Web client requirements (optional)
+fastapi>=0.68.0
+uvicorn>=0.15.0
+pydantic>=1.8.0
+
+# Discord bridge requirements (optional)
+discord.py>=2.0.0
+
+# IRC bridge requirements (optional)
+irc>=20.0.0
+
+# Additional utilities
+python-dotenv>=0.19.0
+pyyaml>=6.0

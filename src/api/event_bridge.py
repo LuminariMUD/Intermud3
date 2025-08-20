@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from src.api.events import Event, EventType, event_dispatcher
 from src.models.packet import (
     ChannelMessagePacket,
-    ChannelEmotePacket,
+    ChannelPacket,
     EmotetoPacket,
     ErrorPacket,
     I3Packet,
@@ -62,7 +62,7 @@ class EventBridge:
                 await self._process_emoteto(packet)
             elif packet.packet_type == PacketType.CHANNEL_MESSAGE:
                 await self._process_channel_message(packet)
-            elif packet.packet_type == PacketType.CHANNEL_EMOTE:
+            elif packet.packet_type == PacketType.CHANNEL_E:
                 await self._process_channel_emote(packet)
             elif packet.packet_type == PacketType.ERROR:
                 await self._process_error(packet)
@@ -152,7 +152,7 @@ class EventBridge:
         
         logger.debug(f"Generated channel_message event for channel {packet.channel}")
     
-    async def _process_channel_emote(self, packet: ChannelEmotePacket):
+    async def _process_channel_emote(self, packet: ChannelPacket):
         """Process channel emote packet and generate event.
         
         Args:
