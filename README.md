@@ -2,12 +2,14 @@
 
 # 🌐 Intermud3 Gateway Service
 
+https://github.com/LuminariMUD/Intermud3
+
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE.md)
 [![Code Style](https://img.shields.io/badge/Code%20Style-Black-black.svg?style=for-the-badge)](https://github.com/psf/black)
 [![Pre-commit](https://img.shields.io/badge/Pre--commit-Enabled-brightgreen?style=for-the-badge&logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/intermud3-gateway/ci.yml?style=for-the-badge&logo=github-actions)](https://github.com/yourusername/intermud3-gateway/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/LuminariMUD/intermud3-gateway/ci.yml?style=for-the-badge&logo=github-actions)](https://github.com/LuminariMUD/intermud3-gateway/actions)
 [![Coverage](https://img.shields.io/badge/Coverage-60%25-yellow.svg?style=for-the-badge&logo=codecov)](coverage.json)
 [![Performance](https://img.shields.io/badge/Performance-1000%2B%20msg%2Fs-brightgreen.svg?style=for-the-badge&logo=lightning)](docs/PERFORMANCE_TUNING.md)
 

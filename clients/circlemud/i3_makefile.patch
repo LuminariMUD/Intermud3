@@ -1,0 +1,43 @@
+--- Makefile.orig	2025-01-01 00:00:00.000000000 +0000
++++ Makefile	2025-01-01 00:00:00.000000000 +0000
+@@ -19,7 +19,7 @@
+ 
+ BINDIR = ../bin
+ 
+-CFLAGS = -g -O2 -Wall
++CFLAGS = -g -O2 -Wall -pthread
+ 
+ #LIBS =  -lsocket -lnsl
+-LIBS = 
++LIBS = -lpthread -ljson-c
+ 
+ ##############################################################################
+@@ -35,7 +35,8 @@
+ 	house.o interpreter.o limits.o magic.o mail.o mobact.o modify.o \
+ 	objsave.o olc.o random.o shop.o spec_assign.o spec_procs.o \
+ 	spell_parser.o spells.o utils.o weather.o boards.o act.clan.o \
+-	act.other.o dg_comm.o dg_db_scripts.o dg_event.o dg_handler.o \
++	act.other.o i3_client.o i3_commands.o i3_protocol.o i3_handler.o \
++	dg_comm.o dg_db_scripts.o dg_event.o dg_handler.o \
+ 	dg_mobcmd.o dg_misc.o dg_objcmd.o dg_scripts.o dg_triggers.o \
+ 	dg_wldcmd.o dg_variables.o
+ 
+@@ -150,6 +151,18 @@
+ dg_variables.o: dg_variables.c conf.h sysdep.h structs.h dg_scripts.h utils.h \
+ 	comm.h interpreter.h handler.h dg_event.h db.h screen.h constants.h
+ 	$(CC) -c $(CFLAGS) dg_variables.c
++i3_client.o: i3_client.c conf.h sysdep.h structs.h utils.h comm.h \
++	interpreter.h handler.h db.h i3_client.h
++	$(CC) -c $(CFLAGS) i3_client.c
++i3_commands.o: i3_commands.c conf.h sysdep.h structs.h utils.h comm.h \
++	interpreter.h handler.h db.h i3_client.h
++	$(CC) -c $(CFLAGS) i3_commands.c
++i3_protocol.o: i3_protocol.c conf.h sysdep.h structs.h utils.h comm.h \
++	interpreter.h handler.h db.h i3_client.h
++	$(CC) -c $(CFLAGS) i3_protocol.c
++i3_handler.o: i3_handler.c conf.h sysdep.h structs.h utils.h comm.h \
++	interpreter.h handler.h db.h i3_client.h
++	$(CC) -c $(CFLAGS) i3_handler.c
+ fight.o: fight.c conf.h sysdep.h structs.h utils.h comm.h handler.h \
+ 	interpreter.h db.h spells.h screen.h constants.h dg_scripts.h
+ 	$(CC) -c $(CFLAGS) fight.c
