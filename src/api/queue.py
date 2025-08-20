@@ -20,9 +20,10 @@ logger = get_logger(__name__)
 class QueuedMessage:
     """A queued message with metadata."""
     
-    message: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    session_id: str
+    content: Any
     priority: int = 5  # 1-10, 1 is highest
+    timestamp: datetime = field(default_factory=datetime.utcnow)
     ttl: Optional[int] = None  # Time to live in seconds
     retry_count: int = 0
     max_retries: int = 3
@@ -39,6 +40,20 @@ class QueuedMessage:
         elapsed = (datetime.utcnow() - self.timestamp).total_seconds()
         return elapsed > self.ttl
     
+    def __lt__(self, other: 'QueuedMessage') -> bool:
+        """Compare messages by priority (lower number = higher priority)."""
+        if self.priority != other.priority:
+            return self.priority < other.priority
+        return self.timestamp < other.timestamp
+    
+    def __eq__(self, other: object) -> bool:
+        """Check message equality."""
+        if not isinstance(other, QueuedMessage):
+            return False
+        return (self.session_id == other.session_id and 
+                self.content == other.content and
+                self.priority == other.priority)
+    
     def can_retry(self) -> bool:
         """Check if message can be retried.
         
@@ -52,7 +67,7 @@ class QueuedMessage:
         self.retry_count += 1
 
 
-class PriorityQueue:
+class PriorityMessageQueue:
     """Priority queue for messages."""
     
     def __init__(self, max_size: int = 1000):
@@ -238,10 +253,14 @@ class MessageQueueManager:
         self.cleanup_interval = cleanup_interval
         
         # Session queues
-        self.queues: Dict[str, PriorityQueue] = {}
+        self.session_queues: Dict[str, PriorityMessageQueue] = {}
         
         # Retry queues for failed messages
         self.retry_queues: Dict[str, List[QueuedMessage]] = {}
+        
+        # Worker task management
+        self.running = False
+        self.worker_task: Optional[asyncio.Task] = None
         
         # Statistics
         self.stats = {
@@ -262,19 +281,20 @@ class MessageQueueManager:
             return
         
         self.running = True
-        self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+        self.worker_task = asyncio.create_task(self._cleanup_loop())
         logger.info("Message queue manager started")
     
     async def stop(self):
         """Stop the queue manager."""
         self.running = False
         
-        if self.cleanup_task:
-            self.cleanup_task.cancel()
+        if self.worker_task:
+            self.worker_task.cancel()
             try:
-                await self.cleanup_task
+                await self.worker_task
             except asyncio.CancelledError:
                 pass
+            self.worker_task = None
         
         logger.info("Message queue manager stopped")
     
@@ -287,11 +307,55 @@ class MessageQueueManager:
             except Exception as e:
                 logger.error(f"Error in cleanup loop: {e}")
     
+    def get_or_create_queue(self, session_id: str) -> PriorityMessageQueue:
+        """Get or create a queue for a session.
+        
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            Priority message queue for the session
+        """
+        if session_id not in self.session_queues:
+            self.session_queues[session_id] = PriorityMessageQueue(self.default_queue_size)
+        return self.session_queues[session_id]
+    
+    def enqueue_message(
+        self,
+        session_id: str,
+        content: Any,
+        priority: int = 5,
+        ttl: Optional[int] = None
+    ) -> bool:
+        """Enqueue a message for a session.
+        
+        Args:
+            session_id: Session ID
+            content: Message content
+            priority: Message priority (1-10, 1 is highest)
+            ttl: Time to live in seconds
+            
+        Returns:
+            True if enqueued, False otherwise
+        """
+        queue = self.get_or_create_queue(session_id)
+        message = QueuedMessage(
+            session_id=session_id,
+            content=content,
+            priority=priority,
+            ttl=ttl or self.default_ttl
+        )
+        
+        success = queue.put(message)
+        if success:
+            self.stats["messages_queued"] += 1
+        return success
+    
     def _cleanup_all_queues(self):
         """Clean up expired messages from all queues."""
         expired_count = 0
         
-        for session_id, queue in self.queues.items():
+        for session_id, queue in self.session_queues.items():
             initial_size = queue.size()
             queue._cleanup_expired()
             expired_count += initial_size - queue.size()
@@ -356,6 +420,85 @@ class MessageQueueManager:
             return queued_msg.message
         
         return None
+    
+    def get_queue_stats(self) -> Dict[str, Any]:
+        """Get queue statistics.
+        
+        Returns:
+            Statistics dictionary
+        """
+        stats = dict(self.stats)
+        stats["session_queues"] = {}
+        
+        for session_id, queue in self.session_queues.items():
+            stats["session_queues"][session_id] = {
+                "size": queue.size(),
+                "max_size": queue.max_size
+            }
+        
+        return stats
+    
+    def cleanup_empty_queues(self):
+        """Remove empty session queues."""
+        empty_sessions = [
+            session_id for session_id, queue in self.session_queues.items()
+            if queue.size() == 0
+        ]
+        
+        for session_id in empty_sessions:
+            del self.session_queues[session_id]
+            logger.debug(f"Removed empty queue for session {session_id}")
+    
+    def remove_session_queue(self, session_id: str):
+        """Remove a session's queue.
+        
+        Args:
+            session_id: Session ID to remove
+        """
+        if session_id in self.session_queues:
+            del self.session_queues[session_id]
+            logger.info(f"Removed queue for session {session_id}")
+    
+    def clear_all_queues(self):
+        """Clear all session queues."""
+        for queue in self.session_queues.values():
+            queue.clear()
+        logger.info("Cleared all session queues")
+    
+    async def process_queues(self):
+        """Process messages from all queues, delivering to sessions."""
+        # Import here to avoid circular imports
+        from src.api.session import session_manager
+        
+        for session_id, queue in self.session_queues.items():
+            session = session_manager.get_session(session_id) if session_manager else None
+            
+            # Skip if session doesn't exist or isn't connected
+            if not session or not session.is_connected():
+                # Clean up queue for disconnected session
+                if session_id in self.session_queues:
+                    del self.session_queues[session_id]
+                continue
+            
+            while queue.size() > 0:
+                queued_msg = queue.get()
+                if queued_msg:
+                    try:
+                        # Convert message content to JSON if needed
+                        content = queued_msg.content
+                        if isinstance(content, dict):
+                            content = json.dumps(content)
+                        
+                        # Send to session
+                        await session.send(content)
+                        self.stats["messages_delivered"] += 1
+                    except Exception as e:
+                        logger.error(f"Failed to deliver message to session {session_id}: {e}")
+                        # Re-queue with retry if possible
+                        if queued_msg.can_retry():
+                            self.add_retry_message(session_id, queued_msg)
+                        else:
+                            self.stats["messages_dropped"] += 1
     
     def get_all_messages(self, session_id: str, limit: int = 100) -> List[str]:
         """Get all queued messages for session.

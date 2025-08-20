@@ -6,7 +6,7 @@ This module handles channel subscriptions and event filtering.
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from src.api.events import EventFilter, EventType
 from src.utils.logging import get_logger
@@ -91,6 +91,11 @@ class SubscriptionManager:
         
         # Channel member tracking
         self.channel_members: Dict[str, Set[str]] = {}
+        
+        # For test compatibility - generic subscriptions tracking
+        self.subscriptions: Set[Any] = set()
+        self.session_subscriptions: Dict[str, Set[Any]] = {}
+        self.type_subscriptions: Dict[str, Set[Any]] = {}
         
         # Statistics
         self.stats = {

@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional
 from src.api.handlers.base import BaseHandler
 from src.api.session import Session
 from src.models.packet import (
-    WhoRequestPacket,
-    FingerRequestPacket,
-    LocateRequestPacket
+    WhoPacket,
+    FingerPacket,
+    LocatePacket
 )
 from src.utils.logging import get_logger
 
@@ -78,7 +78,7 @@ class WhoHandler(BaseHandler):
             }
         
         # Create who request packet
-        packet = WhoRequestPacket(
+        packet = WhoPacket(
             originator_mud=session.mud_name,
             target_mud=target_mud
         )
@@ -200,7 +200,7 @@ class FingerHandler(BaseHandler):
         target_user = params["target_user"]
         
         # Create finger request packet
-        packet = FingerRequestPacket(
+        packet = FingerPacket(
             originator_mud=session.mud_name,
             originator_user="",
             target_mud=target_mud,
@@ -276,7 +276,7 @@ class LocateHandler(BaseHandler):
         target_user = params["target_user"]
         
         # Create locate request packet
-        packet = LocateRequestPacket(
+        packet = LocatePacket(
             originator_mud=session.mud_name,
             originator_user="",
             target_user=target_user

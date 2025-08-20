@@ -10,9 +10,9 @@ from src.api.handlers.base import BaseHandler
 from src.api.session import Session
 from src.models.packet import (
     TellPacket,
-    EmoteToPacket,
+    EmotetoPacket,
     ChannelMessagePacket,
-    ChannelEmotePacket
+    ChannelPacket
 )
 from src.utils.logging import get_logger
 
@@ -154,7 +154,7 @@ class EmoteToHandler(BaseHandler):
             raise ValueError("Invalid parameters")
         
         # Create emoteto packet
-        packet = EmoteToPacket(
+        packet = EmotetoPacket(
             originator_mud=session.mud_name,
             originator_user=params.get("from_user", "System"),
             target_mud=params["target_mud"],
@@ -340,7 +340,7 @@ class ChannelEmoteHandler(BaseHandler):
             session.subscribe(channel)
         
         # Create channel emote packet
-        packet = ChannelEmotePacket(
+        packet = ChannelPacket(
             channel=channel,
             originator_mud=session.mud_name,
             originator_user=params.get("from_user", "System"),

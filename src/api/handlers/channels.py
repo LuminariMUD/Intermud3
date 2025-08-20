@@ -8,10 +8,8 @@ from typing import Any, Dict, List, Optional
 from src.api.handlers.base import BaseHandler
 from src.api.session import Session
 from src.models.packet import (
-    ChannelListRequestPacket,
-    ChannelWhoRequestPacket,
-    ChannelAddPacket,
-    ChannelRemovePacket
+    ChannelPacket,
+    ChannelMessagePacket
 )
 from src.utils.logging import get_logger
 
@@ -82,7 +80,7 @@ class ChannelJoinHandler(BaseHandler):
         
         # Send channel add packet if not listen-only
         if not listen_only and self.gateway:
-            packet = ChannelAddPacket(
+            packet = ChannelPacket(
                 channel=channel,
                 originator_mud=session.mud_name,
                 originator_user=user_name
@@ -170,7 +168,7 @@ class ChannelLeaveHandler(BaseHandler):
         
         # Send channel remove packet
         if self.gateway:
-            packet = ChannelRemovePacket(
+            packet = ChannelPacket(
                 channel=channel,
                 originator_mud=session.mud_name,
                 originator_user=user_name
@@ -381,7 +379,7 @@ class ChannelWhoHandler(BaseHandler):
         channel = params["channel"]
         
         # Create channel who request packet
-        packet = ChannelWhoRequestPacket(
+        packet = ChannelPacket(
             originator_mud=session.mud_name,
             originator_user="",
             channel=channel

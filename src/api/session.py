@@ -498,3 +498,7 @@ class SessionManager:
             "total_messages_received": total_messages_received,
             "total_errors": total_errors
         }
+
+
+# Global session manager instance (will be initialized by the server)
+session_manager: Optional[SessionManager] = None
