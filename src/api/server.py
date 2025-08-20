@@ -22,6 +22,7 @@ from src.api.events import event_dispatcher
 from src.api.event_bridge import event_bridge
 from src.api.subscriptions import subscription_manager
 from src.api.queue import message_queue_manager
+from src.api.api_handlers import APIHandlers
 from src.config.models import APIConfig
 from src.utils.logging import get_logger
 from src.utils.shutdown import ShutdownManager
@@ -48,9 +49,10 @@ class APIServer:
         # Protocol and session management
         self.protocol = JSONRPCProtocol()
         self.session_manager = SessionManager(config)
+        self.handlers = APIHandlers(gateway)
         
         # TCP server
-        self.tcp_server = TCPServer(config, self.session_manager) if config.tcp and config.tcp.enabled else None
+        self.tcp_server = TCPServer(config, self.session_manager, gateway) if config.tcp and config.tcp.enabled else None
         
         # Active WebSocket connections
         self._websockets: Set[WebSocketResponse] = set()
@@ -355,26 +357,7 @@ class APIServer:
         Returns:
             Handler function or None
         """
-        # This will be populated with actual handlers in the next step
-        # For now, return a placeholder
-        handlers = {
-            "ping": self._handle_ping,
-            "status": self._handle_status,
-        }
-        return handlers.get(method)
-
-    async def _handle_ping(self, session: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle ping request."""
-        return {"pong": True, "timestamp": asyncio.get_event_loop().time()}
-
-    async def _handle_status(self, session: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle status request."""
-        return {
-            "connected": True,
-            "mud_name": session.mud_name,
-            "session_id": session.session_id,
-            "uptime": asyncio.get_event_loop().time() - session.connected_at.timestamp()
-        }
+        return self.handlers.get_handler(method)
 
     async def _start_tcp_server(self):
         """Start TCP socket server for legacy support."""

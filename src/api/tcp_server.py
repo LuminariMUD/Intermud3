@@ -11,6 +11,7 @@ from typing import Dict, Optional, Set
 
 from src.api.protocol import JSONRPCProtocol, JSONRPCError
 from src.api.session import Session, SessionManager
+from src.api.api_handlers import APIHandlers
 from src.config.models import APIConfig
 from src.utils.logging import get_logger
 
@@ -25,7 +26,8 @@ class TCPConnection:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
         session_manager: SessionManager,
-        protocol: JSONRPCProtocol
+        protocol: JSONRPCProtocol,
+        handlers: APIHandlers
     ):
         """Initialize TCP connection.
         
@@ -34,10 +36,12 @@ class TCPConnection:
             writer: Async stream writer  
             session_manager: Session manager
             protocol: JSON-RPC protocol handler
+            handlers: API method handlers
         """
         self.reader = reader
         self.writer = writer
         self.session_manager = session_manager
+        self.handlers = handlers
         self.protocol = protocol
         self.session: Optional[Session] = None
         self.buffer = ""
@@ -181,12 +185,28 @@ class TCPConnection:
                     await self.send_json(json.loads(response))
                     return
                 
-                # This will be handled by the main server
-                # For now, just echo back
-                response = self.protocol.format_response(
-                    request.id,
-                    {"echo": request.params}
-                )
+                # Route to appropriate handler
+                handler = self.handlers.get_handler(request.method)
+                if not handler:
+                    response = self.protocol.format_error(
+                        request.id,
+                        JSONRPCError.METHOD_NOT_FOUND,
+                        f"Unknown method: {request.method}"
+                    )
+                    await self.send_json(json.loads(response))
+                    return
+                
+                # Execute handler
+                try:
+                    result = await handler(self.session, request.params)
+                    response = self.protocol.format_response(request.id, result)
+                except Exception as e:
+                    logger.error(f"Error in handler: {e}")
+                    response = self.protocol.format_error(
+                        request.id,
+                        JSONRPCError.INTERNAL_ERROR,
+                        str(e)
+                    )
                 await self.send_json(json.loads(response))
                 
             else:
@@ -258,16 +278,18 @@ class TCPConnection:
 class TCPServer:
     """TCP server for JSON-RPC API."""
     
-    def __init__(self, config: APIConfig, session_manager: SessionManager):
+    def __init__(self, config: APIConfig, session_manager: SessionManager, gateway=None):
         """Initialize TCP server.
         
         Args:
             config: API configuration
             session_manager: Session manager
+            gateway: Gateway instance for I3 network communication
         """
         self.config = config
         self.session_manager = session_manager
         self.protocol = JSONRPCProtocol()
+        self.handlers = APIHandlers(gateway)
         self.server: Optional[asyncio.Server] = None
         self.connections: Set[TCPConnection] = set()
         self._shutdown = False
@@ -328,7 +350,8 @@ class TCPServer:
             reader,
             writer,
             self.session_manager,
-            self.protocol
+            self.protocol,
+            self.handlers
         )
         
         # Track connection

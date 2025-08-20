@@ -13,7 +13,7 @@ from src.models.packet import PacketType, I3Packet
 from src.api.session import Session
 from src.api.events import event_dispatcher
 from src.api.subscriptions import subscription_manager
-from src.state.manager import state_manager
+from src.state.manager import StateManager
 
 logger = structlog.get_logger(__name__)
 
@@ -21,13 +21,15 @@ logger = structlog.get_logger(__name__)
 class APIHandlers:
     """Handles all API method calls."""
     
-    def __init__(self, gateway=None):
+    def __init__(self, gateway=None, state_manager=None):
         """Initialize API handlers.
         
         Args:
             gateway: Gateway instance for I3 network communication
+            state_manager: State manager instance
         """
         self.gateway = gateway
+        self.state_manager = state_manager or StateManager()
         
         # Method registry
         self.methods = {
@@ -405,7 +407,7 @@ class APIHandlers:
         filter_opts = params.get("filter", {})
         
         # Get channels from state manager
-        channels = await state_manager.get_channels()
+        channels = await self.state_manager.get_channels()
         
         # Apply filters if provided
         if filter_opts:
@@ -461,7 +463,7 @@ class APIHandlers:
             await self.gateway.send_packet(packet)
         
         # For now return cached data if available
-        channel_info = await state_manager.get_channel(channel)
+        channel_info = await self.state_manager.get_channel(channel)
         members = channel_info.get("members", []) if channel_info else []
         
         return {
@@ -489,7 +491,7 @@ class APIHandlers:
             raise ValueError("Missing required parameter: channel")
         
         # Get message history from state manager
-        messages = await state_manager.get_channel_history(
+        messages = await self.state_manager.get_channel_history(
             channel,
             limit=limit,
             before=before,
@@ -534,7 +536,7 @@ class APIHandlers:
             await self.gateway.send_packet(packet)
         
         # Return cached data if available
-        who_data = await state_manager.get_who_data(target_mud)
+        who_data = await self.state_manager.get_who_data(target_mud)
         users = who_data.get("users", []) if who_data else []
         
         return {
@@ -574,7 +576,7 @@ class APIHandlers:
             await self.gateway.send_packet(packet)
         
         # Return cached data if available
-        finger_data = await state_manager.get_finger_data(target_mud, target_user)
+        finger_data = await self.state_manager.get_finger_data(target_mud, target_user)
         
         return {
             "status": "success",
@@ -610,7 +612,7 @@ class APIHandlers:
             await self.gateway.send_packet(packet)
         
         # Return cached data if available
-        locate_data = await state_manager.get_locate_data(target_user)
+        locate_data = await self.state_manager.get_locate_data(target_user)
         locations = locate_data.get("locations", []) if locate_data else []
         
         return {
@@ -635,7 +637,7 @@ class APIHandlers:
         filter_opts = params.get("filter", {})
         
         # Get mudlist from state manager
-        muds = await state_manager.get_mudlist()
+        muds = await self.state_manager.get_mudlist()
         
         # Apply filters if provided
         if filter_opts:
@@ -705,7 +707,7 @@ class APIHandlers:
         Returns:
             Statistics information
         """
-        stats = await state_manager.get_stats() if state_manager else {}
+        stats = await self.state_manager.get_stats() if self.state_manager else {}
         
         # Add gateway-specific stats
         if self.gateway:

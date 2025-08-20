@@ -136,6 +136,21 @@ class I3Gateway:
     async def wait_for_shutdown(self) -> None:
         """Wait for the gateway to shutdown."""
         await self._shutdown_event.wait()
+    
+    def is_connected(self) -> bool:
+        """Check if gateway is connected to I3 router.
+        
+        Returns:
+            True if connected, False otherwise
+        """
+        return self.connection_manager.is_connected()
+    
+    async def reconnect(self) -> None:
+        """Force reconnection to I3 router."""
+        self.logger.info("Forcing reconnection to I3 router")
+        if self.connection_manager.is_connected():
+            await self.connection_manager.disconnect()
+        await self.connection_manager.connect()
 
     async def send_packet(self, packet: I3Packet) -> bool:
         """Send a packet to the I3 network.
