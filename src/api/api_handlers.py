@@ -9,7 +9,17 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import structlog
 
-from src.models.packet import PacketType, I3Packet
+from src.models.packet import (
+    PacketType, 
+    I3Packet,
+    TellPacket,
+    EmotetoPacket,
+    ChannelMessagePacket,
+    ChannelPacket,
+    WhoPacket,
+    FingerPacket,
+    LocatePacket
+)
 from src.api.session import Session
 from src.api.events import event_dispatcher
 from src.api.subscriptions import subscription_manager
@@ -104,17 +114,15 @@ class APIHandlers:
             raise ValueError("Missing required parameters: target_mud, target_user, message")
         
         # Create tell packet
-        packet = I3Packet(
-            type=PacketType.TELL,
+        packet = TellPacket(
+            packet_type=PacketType.TELL,
             ttl=5,
             originator_mudname=session.mud_name,
             originator_username=from_user,
             target_mudname=target_mud,
             target_username=target_user,
-            payload={
-                "visname": from_user,
-                "message": message
-            }
+            visname=from_user,
+            message=message
         )
         
         # Send through gateway
@@ -157,17 +165,15 @@ class APIHandlers:
             raise ValueError("Missing required parameters: target_mud, target_user, emote")
         
         # Create emoteto packet
-        packet = I3Packet(
-            type=PacketType.EMOTETO,
+        packet = EmotetoPacket(
+            packet_type=PacketType.EMOTETO,
             ttl=5,
             originator_mudname=session.mud_name,
             originator_username=from_user,
             target_mudname=target_mud,
             target_username=target_user,
-            payload={
-                "visname": from_user,
-                "message": emote
-            }
+            visname=from_user,
+            message=emote
         )
         
         # Send through gateway
@@ -212,18 +218,16 @@ class APIHandlers:
             raise ValueError("Missing required parameters: channel, message")
         
         # Create channel message packet
-        packet = I3Packet(
-            type=PacketType.CHANNEL_M,
+        packet = ChannelMessagePacket(
+            packet_type=PacketType.CHANNEL_M,
             ttl=5,
             originator_mudname=session.mud_name,
             originator_username=from_user,
             target_mudname="*",
             target_username="*",
-            payload={
-                "channel": channel,
-                "visname": visname,
-                "message": message
-            }
+            channel=channel,
+            visname=visname,
+            message=message
         )
         
         # Send through gateway
@@ -265,18 +269,16 @@ class APIHandlers:
             raise ValueError("Missing required parameters: channel, emote")
         
         # Create channel emote packet
-        packet = I3Packet(
-            type=PacketType.CHANNEL_E,
+        packet = ChannelMessagePacket(
+            packet_type=PacketType.CHANNEL_E,
             ttl=5,
             originator_mudname=session.mud_name,
             originator_username=from_user,
             target_mudname="*",
             target_username="*",
-            payload={
-                "channel": channel,
-                "visname": visname,
-                "message": emote
-            }
+            channel=channel,
+            visname=visname,
+            message=emote
         )
         
         # Send through gateway
@@ -321,17 +323,15 @@ class APIHandlers:
         
         # Send channel listen packet if not listen-only
         if not listen_only and self.gateway:
-            packet = I3Packet(
-                type=PacketType.CHANNEL_LISTEN,
+            packet = ChannelPacket(
+                packet_type=PacketType.CHANNEL_LISTEN,
                 ttl=5,
                 originator_mudname=session.mud_name,
                 originator_username=user_name or "*",
                 target_mudname="*",
                 target_username="*",
-                payload={
-                    "channel": channel,
-                    "on_off": 1  # 1 = join, 0 = leave
-                }
+                channel=channel,
+                message=str(1)  # 1 = join, 0 = leave
             )
             await self.gateway.send_packet(packet)
         
@@ -368,17 +368,15 @@ class APIHandlers:
         
         # Send channel listen packet to leave
         if self.gateway:
-            packet = I3Packet(
-                type=PacketType.CHANNEL_LISTEN,
+            packet = ChannelPacket(
+                packet_type=PacketType.CHANNEL_LISTEN,
                 ttl=5,
                 originator_mudname=session.mud_name,
                 originator_username=user_name or "*",
                 target_mudname="*",
                 target_username="*",
-                payload={
-                    "channel": channel,
-                    "on_off": 0  # 0 = leave
-                }
+                channel=channel,
+                message=str(0)  # 0 = leave
             )
             await self.gateway.send_packet(packet)
         
@@ -449,16 +447,15 @@ class APIHandlers:
         
         # Send channel who request
         if self.gateway:
-            packet = I3Packet(
-                type=PacketType.CHAN_WHO_REQ,
+            packet = ChannelPacket(
+                packet_type=PacketType.CHAN_WHO_REQ,
                 ttl=5,
                 originator_mudname=session.mud_name,
                 originator_username="*",
                 target_mudname="*",
                 target_username="*",
-                payload={
-                    "channel": channel
-                }
+                channel=channel,
+                message=""
             )
             await self.gateway.send_packet(packet)
         
@@ -524,14 +521,14 @@ class APIHandlers:
         
         # Send who request
         if self.gateway:
-            packet = I3Packet(
-                type=PacketType.WHO_REQ,
+            packet = WhoPacket(
+                packet_type=PacketType.WHO_REQ,
                 ttl=5,
                 originator_mudname=session.mud_name,
                 originator_username="*",
                 target_mudname=target_mud,
                 target_username="*",
-                payload=filters
+                filter_criteria=filters
             )
             await self.gateway.send_packet(packet)
         
@@ -564,14 +561,14 @@ class APIHandlers:
         
         # Send finger request
         if self.gateway:
-            packet = I3Packet(
-                type=PacketType.FINGER_REQ,
+            packet = FingerPacket(
+                packet_type=PacketType.FINGER_REQ,
                 ttl=5,
                 originator_mudname=session.mud_name,
                 originator_username="*",
                 target_mudname=target_mud,
-                target_username=target_user,
-                payload={}
+                target_username="*",
+                username=target_user
             )
             await self.gateway.send_packet(packet)
         
@@ -600,14 +597,14 @@ class APIHandlers:
         
         # Send locate request
         if self.gateway:
-            packet = I3Packet(
-                type=PacketType.LOCATE_REQ,
+            packet = LocatePacket(
+                packet_type=PacketType.LOCATE_REQ,
                 ttl=5,
                 originator_mudname=session.mud_name,
                 originator_username="*",
                 target_mudname="*",
-                target_username=target_user,
-                payload={}
+                target_username="*",
+                user_to_locate=target_user
             )
             await self.gateway.send_packet(packet)
         

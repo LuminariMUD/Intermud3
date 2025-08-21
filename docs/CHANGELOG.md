@@ -5,6 +5,21 @@ All notable changes to the Intermud3 Gateway Service will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7] - 2025-08-21
+
+### Fixed
+- **CRITICAL**: Fixed API handler methods using abstract `I3Packet` class instead of concrete packet classes
+  - All 11 handler methods now correctly instantiate proper packet types (TellPacket, EmotetoPacket, etc.)
+  - Added imports for all concrete packet classes in `api_handlers.py`
+  - Fixed packet field names to match concrete class attributes
+  - Phase 3 is now fully complete with working I3 functionality through the API
+- Fixed test suite to use `server.handlers.handle_*` instead of deprecated `server._handle_*` methods
+- Fixed datetime mocking in status handler test for proper uptime calculation
+
+### Changed
+- API handlers now properly construct packets with correct type-specific fields
+- Test architecture updated to match new APIHandlers class structure
+
 ## [0.3.6] - 2025-08-20
 
 ### Added

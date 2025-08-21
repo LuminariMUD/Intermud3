@@ -268,7 +268,7 @@ class TestAPIServer:
         """Test ping handler."""
         mock_session = MagicMock(spec=Session)
         
-        result = await server._handle_ping(mock_session, {})
+        result = await server.handlers.handle_ping(mock_session, {})
         
         assert result["pong"] is True
         assert "timestamp" in result
@@ -276,21 +276,20 @@ class TestAPIServer:
     @pytest.mark.asyncio
     async def test_status_handler(self, server):
         """Test status handler."""
-        from datetime import datetime
+        from datetime import datetime, timedelta
         
         mock_session = MagicMock(spec=Session)
         mock_session.mud_name = "TestMUD"
         mock_session.session_id = "test-session-123"
         
-        # Mock connected_at as a datetime object with timestamp method
-        mock_connected_at = MagicMock(spec=datetime)
-        mock_connected_at.timestamp.return_value = 1000.0
-        mock_session.connected_at = mock_connected_at
-        
-        with patch('asyncio.get_event_loop') as mock_loop:
-            mock_loop.return_value.time.return_value = 2000.0
+        # Set connected_at to 1000 seconds ago
+        with patch('src.api.api_handlers.datetime') as mock_datetime:
+            now = datetime(2025, 1, 1, 12, 0, 0)
+            connected_at = datetime(2025, 1, 1, 11, 43, 20)  # 1000 seconds ago
+            mock_datetime.utcnow.return_value = now
+            mock_session.connected_at = connected_at
             
-            result = await server._handle_status(mock_session, {})
+            result = await server.handlers.handle_status(mock_session, {})
             
             assert result["connected"] is True
             assert result["mud_name"] == "TestMUD"
