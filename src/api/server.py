@@ -360,7 +360,7 @@ class APIServer:
         return self.handlers.get_handler(method)
 
     async def _start_tcp_server(self):
-        """Start TCP socket server for legacy support."""
+        """Start TCP socket server."""
         # This will be implemented in the TCP server module
         logger.info("TCP server support will be implemented in tcp_server.py")
 

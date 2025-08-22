@@ -159,7 +159,7 @@ class FingerHandler(BaseHandler):
     
     def get_required_params(self) -> list[str]:
         """Get required parameters."""
-        return ["target_mud", "target_user"]
+        return ["target_mud"]  # target_user or username checked in validate_params
     
     def validate_params(self, params: Dict[str, Any]) -> bool:
         """Validate finger parameters."""
@@ -171,10 +171,14 @@ class FingerHandler(BaseHandler):
             logger.warning("Target MUD name is empty")
             return False
         
-        # Validate target user
-        if not params.get("target_user"):
+        # Accept both 'target_user' and 'username' for backward compatibility
+        if not params.get("target_user") and not params.get("username"):
             logger.warning("Target user name is empty")
             return False
+        
+        # Normalize to target_user
+        if "username" in params and "target_user" not in params:
+            params["target_user"] = params["username"]
         
         return True
     

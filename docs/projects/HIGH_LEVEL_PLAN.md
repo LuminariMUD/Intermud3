@@ -541,7 +541,7 @@ The gateway acts as a protocol translator, handling all I3 complexity internally
 
 - ✅ **API Server Foundation**
   - WebSocket server with aiohttp for real-time bidirectional communication
-  - TCP socket server for legacy MUD support (line-delimited JSON)
+  - TCP socket server for direct MUD connections (line-delimited JSON)
   - Full JSON-RPC 2.0 protocol implementation with batch support
   - Comprehensive session management with rate limiting and metrics
   

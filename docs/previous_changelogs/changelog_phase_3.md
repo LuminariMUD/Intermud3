@@ -135,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **API Server Foundation** ✅
   - WebSocket server implementation (`src/api/server.py`) with aiohttp
   - JSON-RPC 2.0 protocol handler (`src/api/protocol.py`) with full spec compliance
-  - TCP socket server (`src/api/tcp_server.py`) for legacy MUD support
+  - TCP socket server (`src/api/tcp_server.py`) for direct MUD connections
   - Session management (`src/api/session.py`) with rate limiting and metrics
   
 - **Request Handlers** ✅

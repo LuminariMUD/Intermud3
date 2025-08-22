@@ -1,7 +1,7 @@
-"""TCP socket server for legacy MUD support.
+"""TCP socket server for MUD integration.
 
-This module provides a TCP-based JSON-RPC interface for MUDs that cannot
-use WebSocket connections.
+This module provides a TCP-based JSON-RPC interface for direct socket
+connections from MUD servers.
 """
 
 import asyncio

@@ -70,6 +70,7 @@ class APIHandlers:
             "status": self.handle_status,
             "stats": self.handle_stats,
             "reconnect": self.handle_reconnect,
+            "heartbeat": self.handle_heartbeat,
         }
     
     def get_handler(self, method: str):
@@ -115,12 +116,11 @@ class APIHandlers:
         
         # Create tell packet
         packet = TellPacket(
-            packet_type=PacketType.TELL,
             ttl=5,
-            originator_mudname=session.mud_name,
-            originator_username=from_user,
-            target_mudname=target_mud,
-            target_username=target_user,
+            originator_mud=session.mud_name,
+            originator_user=from_user,
+            target_mud=target_mud,
+            target_user=target_user,
             visname=from_user,
             message=message
         )
@@ -166,12 +166,11 @@ class APIHandlers:
         
         # Create emoteto packet
         packet = EmotetoPacket(
-            packet_type=PacketType.EMOTETO,
             ttl=5,
-            originator_mudname=session.mud_name,
-            originator_username=from_user,
-            target_mudname=target_mud,
-            target_username=target_user,
+            originator_mud=session.mud_name,
+            originator_user=from_user,
+            target_mud=target_mud,
+            target_user=target_user,
             visname=from_user,
             message=emote
         )
@@ -219,12 +218,11 @@ class APIHandlers:
         
         # Create channel message packet
         packet = ChannelMessagePacket(
-            packet_type=PacketType.CHANNEL_M,
             ttl=5,
-            originator_mudname=session.mud_name,
-            originator_username=from_user,
-            target_mudname="*",
-            target_username="*",
+            originator_mud=session.mud_name,
+            originator_user=from_user,
+            target_mud="*",
+            target_user="*",
             channel=channel,
             visname=visname,
             message=message
@@ -268,18 +266,19 @@ class APIHandlers:
         if not all([channel, emote]):
             raise ValueError("Missing required parameters: channel, emote")
         
-        # Create channel emote packet
+        # Create channel emote packet  
         packet = ChannelMessagePacket(
-            packet_type=PacketType.CHANNEL_E,
             ttl=5,
-            originator_mudname=session.mud_name,
-            originator_username=from_user,
-            target_mudname="*",
-            target_username="*",
+            originator_mud=session.mud_name,
+            originator_user=from_user,
+            target_mud="*",
+            target_user="*",
             channel=channel,
             visname=visname,
             message=emote
         )
+        # Set packet type to channel emote after creation
+        packet.packet_type = PacketType.CHANNEL_E
         
         # Send through gateway
         if self.gateway:
@@ -326,10 +325,10 @@ class APIHandlers:
             packet = ChannelPacket(
                 packet_type=PacketType.CHANNEL_LISTEN,
                 ttl=5,
-                originator_mudname=session.mud_name,
-                originator_username=user_name or "*",
-                target_mudname="*",
-                target_username="*",
+                originator_mud=session.mud_name,
+                originator_user=user_name or "*",
+                target_mud="*",
+                target_user="*",
                 channel=channel,
                 message=str(1)  # 1 = join, 0 = leave
             )
@@ -371,10 +370,10 @@ class APIHandlers:
             packet = ChannelPacket(
                 packet_type=PacketType.CHANNEL_LISTEN,
                 ttl=5,
-                originator_mudname=session.mud_name,
-                originator_username=user_name or "*",
-                target_mudname="*",
-                target_username="*",
+                originator_mud=session.mud_name,
+                originator_user=user_name or "*",
+                target_mud="*",
+                target_user="*",
                 channel=channel,
                 message=str(0)  # 0 = leave
             )
@@ -450,10 +449,10 @@ class APIHandlers:
             packet = ChannelPacket(
                 packet_type=PacketType.CHAN_WHO_REQ,
                 ttl=5,
-                originator_mudname=session.mud_name,
-                originator_username="*",
-                target_mudname="*",
-                target_username="*",
+                originator_mud=session.mud_name,
+                originator_user="*",
+                target_mud="*",
+                target_user="*",
                 channel=channel,
                 message=""
             )
@@ -524,10 +523,10 @@ class APIHandlers:
             packet = WhoPacket(
                 packet_type=PacketType.WHO_REQ,
                 ttl=5,
-                originator_mudname=session.mud_name,
-                originator_username="*",
-                target_mudname=target_mud,
-                target_username="*",
+                originator_mud=session.mud_name,
+                originator_user="*",
+                target_mud=target_mud,
+                target_user="*",
                 filter_criteria=filters
             )
             await self.gateway.send_packet(packet)
@@ -564,10 +563,10 @@ class APIHandlers:
             packet = FingerPacket(
                 packet_type=PacketType.FINGER_REQ,
                 ttl=5,
-                originator_mudname=session.mud_name,
-                originator_username="*",
-                target_mudname=target_mud,
-                target_username="*",
+                originator_mud=session.mud_name,
+                originator_user="*",
+                target_mud=target_mud,
+                target_user="*",
                 username=target_user
             )
             await self.gateway.send_packet(packet)
@@ -600,10 +599,10 @@ class APIHandlers:
             packet = LocatePacket(
                 packet_type=PacketType.LOCATE_REQ,
                 ttl=5,
-                originator_mudname=session.mud_name,
-                originator_username="*",
-                target_mudname="*",
-                target_username="*",
+                originator_mud=session.mud_name,
+                originator_user="*",
+                target_mud="*",
+                target_user="*",
                 user_to_locate=target_user
             )
             await self.gateway.send_packet(packet)
@@ -731,3 +730,18 @@ class APIHandlers:
             return {"status": "reconnecting"}
         else:
             return {"status": "no_gateway"}
+    
+    async def handle_heartbeat(self, session: Session, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle heartbeat/keepalive from client.
+        
+        Args:
+            session: Client session
+            params: {}
+            
+        Returns:
+            {status, timestamp}
+        """
+        return {
+            "status": "ok",
+            "timestamp": datetime.utcnow().isoformat()
+        }

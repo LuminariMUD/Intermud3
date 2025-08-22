@@ -78,8 +78,8 @@ Phase 3 implementation has been successfully completed with all milestones achie
 ### API Protocol Design
 
 #### Transport Layer
-- **Primary**: WebSocket for real-time bidirectional communication
-- **Fallback**: TCP Socket for compatibility with older systems
+- **WebSocket**: Real-time bidirectional communication protocol
+- **TCP Socket**: Direct connection protocol for MUD servers
 - **Encoding**: UTF-8 JSON messages
 - **Framing**: Line-delimited for TCP, WebSocket frames for WS
 
@@ -161,7 +161,7 @@ class Session:
    - Graceful shutdown handling
 
 2. **TCP Socket Server** (`src/api/tcp_server.py`)
-   - Async TCP server for legacy support
+   - Async TCP server for MUD integration
    - Line-delimited JSON protocol
    - Connection pooling
 
@@ -797,7 +797,7 @@ pytest-benchmark>=4.0  # Performance testing
 - [x] API server foundation (`src/api/server.py`)
 - [x] JSON-RPC protocol handler (`src/api/protocol.py`)
 - [x] Session management (`src/api/session.py`)
-- [x] TCP server for legacy support (`src/api/tcp_server.py`)
+- [x] TCP server for direct socket connections (`src/api/tcp_server.py`)
 - [x] Request handlers
   - [x] Base handler (`src/api/handlers/base.py`)
   - [x] Communication handlers (`src/api/handlers/communication.py`)

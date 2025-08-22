@@ -299,7 +299,13 @@ class I3Gateway:
                 self.logger.error("Error processing packet", error=str(e))
 
     async def _handle_mudlist(self, packet: Any):
-        """Handle mudlist update from router."""
+        """Handle mudlist update from router.
+        
+        Note: The mudlist is sent by the I3 router after the initial connection
+        is established. It may take a few seconds after gateway startup before
+        the full mudlist is available. Clients should handle empty mudlist
+        responses gracefully during this initial period.
+        """
         from .models.packet import MudlistPacket
 
         if isinstance(packet, MudlistPacket):

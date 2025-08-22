@@ -226,6 +226,20 @@ class SubscriptionManager:
         
         return list(self.channel_subscriptions[session_id].keys())
     
+    def get_channel_subscriptions(self, session_id: str) -> Set[str]:
+        """Get set of channels session is subscribed to.
+        
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            Set of channel names
+        """
+        if session_id not in self.channel_subscriptions:
+            return set()
+        
+        return set(self.channel_subscriptions[session_id].keys())
+    
     def get_subscription_info(
         self,
         session_id: str,
