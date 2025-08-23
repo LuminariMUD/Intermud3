@@ -5,6 +5,33 @@ All notable changes to the Intermud3 Gateway Service will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2025-08-23
+
+### Tested
+- **Live Integration Test**: Successfully tested with LuminariMUD production environment
+  - TCP connection established and maintained on port 8081
+  - Authentication working with API key format: `API_KEY_LUMINARI:luminari-i3-gateway-2025`
+  - Heartbeat mechanism confirmed working (30-second intervals)
+  - Channel message successfully sent from user "Zusuk" to imud_gossip channel
+  - All basic commands (tell, channel_join, channel_send) returning success responses
+
+### Verified
+- Gateway handles reconnections gracefully when MUD disconnects
+- Multiple gateway instances can be detected and cleaned up
+- Logging to file (`/tmp/i3_gateway.log`) for persistent monitoring
+- Gateway remains stable even when I3 router connection cycles
+
+### Known Issues
+- I3 router disconnects every ~5 minutes (likely due to "TestGateway" not being recognized)
+- Need to register proper MUD name with I3 network administrators
+- `channel_list` method still has missing `get_channel_subscriptions` attribute
+- `finger` method parameter validation needs fixing
+
+### Documentation
+- Updated I3_TEST_REPORT.md with live test results from 2025-08-23
+- Added detailed troubleshooting steps for gateway monitoring
+- Documented API key configuration requirements
+
 ## [0.3.7] - 2025-08-21
 
 ### Fixed
