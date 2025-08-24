@@ -2,4 +2,5 @@
 
 from src.api.handlers.base import BaseHandler
 
+
 __all__ = ["BaseHandler"]

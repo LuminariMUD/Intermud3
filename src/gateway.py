@@ -26,9 +26,7 @@ class I3Gateway:
         self._shutdown_event = asyncio.Event()
 
         # Initialize components
-        self.state_manager = StateManager(
-            persistence_dir=Path("data"), cache_ttl=300.0
-        )
+        self.state_manager = StateManager(persistence_dir=Path("data"), cache_ttl=300.0)
 
         self.service_manager = ServiceManager(self.state_manager)
 
@@ -70,7 +68,7 @@ class I3Gateway:
         # Packet processing
         self.packet_queue: asyncio.Queue = asyncio.Queue()
         self._processing_task: asyncio.Task | None = None
-        
+
         # API Server
         self.api_server = APIServer(settings.api, self) if settings.api.enabled else None
 
@@ -96,13 +94,15 @@ class I3Gateway:
         if not connected:
             self.logger.error("Failed to connect to any I3 router")
             # Gateway will keep trying to reconnect automatically
-        
+
         # Start API server if enabled
         if self.api_server:
             await self.api_server.start()
-            self.logger.info("API servers started", 
-                           websocket_port=self.settings.api.port,
-                           tcp_port=self.settings.api.tcp.port if self.settings.api.tcp.enabled else None)
+            self.logger.info(
+                "API servers started",
+                websocket_port=self.settings.api.port,
+                tcp_port=self.settings.api.tcp.port if self.settings.api.tcp.enabled else None,
+            )
 
         self.logger.info("I3 Gateway started successfully")
 
@@ -122,7 +122,7 @@ class I3Gateway:
         # Stop API server if running
         if self.api_server:
             await self.api_server.stop()
-        
+
         # Disconnect from router
         await self.connection_manager.disconnect()
 
@@ -136,15 +136,15 @@ class I3Gateway:
     async def wait_for_shutdown(self) -> None:
         """Wait for the gateway to shutdown."""
         await self._shutdown_event.wait()
-    
+
     def is_connected(self) -> bool:
         """Check if gateway is connected to I3 router.
-        
+
         Returns:
             True if connected, False otherwise
         """
         return self.connection_manager.is_connected()
-    
+
     async def reconnect(self) -> None:
         """Force reconnection to I3 router."""
         self.logger.info("Forcing reconnection to I3 router")
@@ -300,7 +300,7 @@ class I3Gateway:
 
     async def _handle_mudlist(self, packet: Any):
         """Handle mudlist update from router.
-        
+
         Note: The mudlist is sent by the I3 router after the initial connection
         is established. It may take a few seconds after gateway startup before
         the full mudlist is available. Clients should handle empty mudlist

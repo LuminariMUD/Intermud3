@@ -80,11 +80,11 @@ API_TCP_PORT=8081
 I3_GATEWAY_SECRET=your-secret-key-here
 
 # MUD Configuration
-MUD_NAME=YourMUD
-MUD_PORT=4000
-MUD_ADMIN_EMAIL=admin@yourmud.com
+MUD_NAME=LuminariMUD
+MUD_PORT=4100
+MUD_ADMIN_EMAIL=max@aiwithapex.com
 MUD_TYPE=Circle
-MUD_STATUS=Development
+MUD_STATUS=open
 
 # I3 Router Configuration
 I3_ROUTER_HOST=204.209.44.3
@@ -305,6 +305,67 @@ docker-compose down
 ```
 
 ## Production Deployment
+
+### Pre-Production Checklist
+
+Before deploying to production:
+
+1. **Register MUD Name with I3 Network**
+   - Contact I3 router administrators to register "LuminariMUD"
+   - This prevents the 5-minute disconnection cycle for unregistered MUDs
+   - Primary router admin contact: Check *i3 router status page
+
+2. **Generate Production Secrets**
+   ```bash
+   # Generate API key for LuminariMUD
+   openssl rand -hex 32 > luminari-api-key.txt
+   
+   # Generate gateway secret
+   openssl rand -hex 32 > gateway-secret.txt
+   ```
+
+3. **SSL/TLS Setup (Optional but Recommended)**
+   - Obtain SSL certificate for WebSocket connections
+   - Configure reverse proxy (nginx/Apache) for SSL termination
+
+4. **Backup Strategy**
+   - Set up automated daily backups of state/ directory
+   - Configure backup retention policy (recommended: 7 days)
+
+### Production Environment Variables
+
+Create `/opt/i3-gateway/.env.production`:
+
+```bash
+# Production settings for LuminariMUD
+MUD_NAME=LuminariMUD
+MUD_PORT=4100
+MUD_ADMIN_EMAIL=max@aiwithapex.com
+MUD_TYPE=Circle
+MUD_STATUS=open
+
+# API Configuration
+API_WS_HOST=0.0.0.0
+API_WS_PORT=8080
+API_TCP_HOST=0.0.0.0
+API_TCP_PORT=8081
+API_AUTH_ENABLED=true
+API_KEY_LUMINARI=<generated-api-key>
+I3_GATEWAY_SECRET=<generated-secret>
+
+# I3 Router (Production)
+I3_ROUTER_HOST=204.209.44.3
+I3_ROUTER_PORT=8080
+
+# Logging (Production)
+LOG_LEVEL=WARNING
+LOG_FILE=/var/log/i3-gateway/production.log
+
+# Performance Tuning
+MAX_CONNECTIONS=500
+MESSAGE_QUEUE_SIZE=5000
+CACHE_TTL=600
+```
 
 ### Systemd Service
 

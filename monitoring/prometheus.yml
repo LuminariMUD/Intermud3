@@ -1,0 +1,40 @@
+# Prometheus Configuration for I3 Gateway Monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'i3-gateway'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # I3 Gateway metrics
+  - job_name: 'i3-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['i3-gateway:8080']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'luminarimud-gateway'
+    
+  # Node exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    
+  # Docker daemon metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['docker-daemon:9323']

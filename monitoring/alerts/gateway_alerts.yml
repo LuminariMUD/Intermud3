@@ -1,0 +1,91 @@
+# I3 Gateway Alert Rules
+groups:
+  - name: gateway_availability
+    interval: 30s
+    rules:
+      - alert: GatewayDown
+        expr: up{job="i3-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: i3-gateway
+        annotations:
+          summary: "I3 Gateway is down"
+          description: "I3 Gateway {{ $labels.instance }} has been down for more than 2 minutes."
+          
+      - alert: RouterConnectionLost
+        expr: i3_router_connected == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: i3-gateway
+        annotations:
+          summary: "Lost connection to I3 router"
+          description: "Gateway has been disconnected from I3 router for more than 5 minutes."
+          
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="i3-gateway"} > 1e+9
+        for: 10m
+        labels:
+          severity: warning
+          service: i3-gateway
+        annotations:
+          summary: "High memory usage detected"
+          description: "I3 Gateway is using more than 1GB of memory (current: {{ $value | humanize }})."
+          
+  - name: gateway_performance
+    interval: 30s
+    rules:
+      - alert: HighPacketLatency
+        expr: i3_packet_processing_duration_seconds > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: i3-gateway
+        annotations:
+          summary: "High packet processing latency"
+          description: "Packet processing is taking more than 100ms (current: {{ $value }}s)."
+          
+      - alert: PacketQueueBacklog
+        expr: i3_packet_queue_size > 500
+        for: 3m
+        labels:
+          severity: warning
+          service: i3-gateway
+        annotations:
+          summary: "Packet queue backlog detected"
+          description: "Packet queue has more than 500 items (current: {{ $value }})."
+          
+      - alert: APIHighErrorRate
+        expr: rate(api_request_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: i3-gateway-api
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is above 10% (current: {{ $value | humanizePercentage }})."
+          
+  - name: gateway_connections
+    interval: 30s
+    rules:
+      - alert: TooManyConnections
+        expr: api_active_connections > 900
+        for: 2m
+        labels:
+          severity: warning
+          service: i3-gateway-api
+        annotations:
+          summary: "Approaching connection limit"
+          description: "API has {{ $value }} active connections (limit: 1000)."
+          
+      - alert: MUDDisconnected
+        expr: mud_connection_status{mud_name="LuminariMUD"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: i3-gateway
+          mud: LuminariMUD
+        annotations:
+          summary: "LuminariMUD disconnected"
+          description: "LuminariMUD has been disconnected for more than 5 minutes."

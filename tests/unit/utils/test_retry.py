@@ -1,23 +1,23 @@
 """Tests for retry mechanism implementation."""
 
 import asyncio
-import time
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch, call
 
 from src.utils.retry import (
     BackoffStrategy,
     RetryConfig,
-    RetryStats,
     RetryHandler,
     RetryManager,
+    RetryStats,
+    get_retry_handler,
+    get_retry_manager,
     retry,
     retry_on_network_error,
     retry_on_timeout,
-    retry_with_fibonacci,
     retry_with_decorrelated_jitter,
-    get_retry_handler,
-    get_retry_manager,
+    retry_with_fibonacci,
 )
 
 
@@ -52,6 +52,7 @@ class TestRetryConfig:
 
     def test_custom_config(self):
         """Test custom configuration values."""
+
         def custom_retry_if(exc):
             return isinstance(exc, ValueError)
 
@@ -175,11 +176,7 @@ class TestRetryHandler:
 
     def test_calculate_delay_fixed(self):
         """Test fixed delay calculation."""
-        config = RetryConfig(
-            strategy=BackoffStrategy.FIXED,
-            initial_delay=2.0,
-            jitter=False
-        )
+        config = RetryConfig(strategy=BackoffStrategy.FIXED, initial_delay=2.0, jitter=False)
         handler = RetryHandler(config)
 
         assert handler.calculate_delay(0) == 2.0
@@ -188,11 +185,7 @@ class TestRetryHandler:
 
     def test_calculate_delay_linear(self):
         """Test linear delay calculation."""
-        config = RetryConfig(
-            strategy=BackoffStrategy.LINEAR,
-            initial_delay=1.0,
-            jitter=False
-        )
+        config = RetryConfig(strategy=BackoffStrategy.LINEAR, initial_delay=1.0, jitter=False)
         handler = RetryHandler(config)
 
         assert handler.calculate_delay(0) == 1.0
@@ -206,7 +199,7 @@ class TestRetryHandler:
             strategy=BackoffStrategy.EXPONENTIAL,
             initial_delay=1.0,
             exponential_base=2.0,
-            jitter=False
+            jitter=False,
         )
         handler = RetryHandler(config)
 
@@ -217,11 +210,7 @@ class TestRetryHandler:
 
     def test_calculate_delay_fibonacci(self):
         """Test Fibonacci delay calculation."""
-        config = RetryConfig(
-            strategy=BackoffStrategy.FIBONACCI,
-            initial_delay=1.0,
-            jitter=False
-        )
+        config = RetryConfig(strategy=BackoffStrategy.FIBONACCI, initial_delay=1.0, jitter=False)
         handler = RetryHandler(config)
 
         assert handler.calculate_delay(0) == 0.0  # F(0) = 0
@@ -231,15 +220,12 @@ class TestRetryHandler:
         assert handler.calculate_delay(4) == 3.0  # F(4) = 3
         assert handler.calculate_delay(5) == 5.0  # F(5) = 5
 
-    @patch('random.uniform')
+    @patch("random.uniform")
     def test_calculate_delay_decorrelated(self, mock_uniform):
         """Test decorrelated jitter delay calculation."""
         mock_uniform.return_value = 3.0
-        
-        config = RetryConfig(
-            strategy=BackoffStrategy.DECORRELATED,
-            initial_delay=1.0
-        )
+
+        config = RetryConfig(strategy=BackoffStrategy.DECORRELATED, initial_delay=1.0)
         handler = RetryHandler(config)
 
         # First attempt uses initial delay
@@ -248,7 +234,7 @@ class TestRetryHandler:
         # Subsequent attempts use decorrelated jitter
         handler.stats.retry_history = [2.0]
         delay = handler.calculate_delay(1)
-        
+
         mock_uniform.assert_called_with(1.0, 6.0)  # 2.0 * 3
         assert delay == 3.0
 
@@ -259,27 +245,23 @@ class TestRetryHandler:
             initial_delay=10.0,
             exponential_base=10.0,
             max_delay=50.0,
-            jitter=False
+            jitter=False,
         )
         handler = RetryHandler(config)
 
         # Should cap at max_delay
         assert handler.calculate_delay(3) == 50.0  # 10 * 10^3 = 10000, capped to 50
 
-    @patch('random.uniform')
+    @patch("random.uniform")
     def test_calculate_delay_with_jitter(self, mock_uniform):
         """Test delay calculation with jitter."""
         mock_uniform.return_value = 0.5  # Add 50% of jitter range
-        
-        config = RetryConfig(
-            strategy=BackoffStrategy.FIXED,
-            initial_delay=4.0,
-            jitter=True
-        )
+
+        config = RetryConfig(strategy=BackoffStrategy.FIXED, initial_delay=4.0, jitter=True)
         handler = RetryHandler(config)
 
         delay = handler.calculate_delay(0)
-        
+
         # Jitter range is 25% of delay = 1.0
         # random.uniform(-1.0, 1.0) returns 0.5
         # Expected: 4.0 + 0.5 = 4.5
@@ -288,14 +270,10 @@ class TestRetryHandler:
 
     def test_calculate_delay_negative_protection(self):
         """Test protection against negative delays."""
-        config = RetryConfig(
-            strategy=BackoffStrategy.FIXED,
-            initial_delay=1.0,
-            jitter=True
-        )
+        config = RetryConfig(strategy=BackoffStrategy.FIXED, initial_delay=1.0, jitter=True)
         handler = RetryHandler(config)
 
-        with patch('random.uniform', return_value=-2.0):  # Large negative jitter
+        with patch("random.uniform", return_value=-2.0):  # Large negative jitter
             delay = handler.calculate_delay(0)
             assert delay == 0.0  # Should be clamped to 0
 
@@ -339,6 +317,7 @@ class TestRetryHandler:
 
     def test_should_retry_custom_condition(self):
         """Test retry decision with custom condition."""
+
         def custom_condition(exc):
             return "retry" in str(exc)
 
@@ -350,6 +329,7 @@ class TestRetryHandler:
 
     def test_should_retry_custom_condition_overrides_type(self):
         """Test that custom condition overrides exception type check."""
+
         def always_false(exc):
             return False
 
@@ -392,11 +372,11 @@ class TestRetryHandler:
         """Test async execution with retries."""
         config = RetryConfig(max_attempts=3, initial_delay=0.01, jitter=False)
         handler = RetryHandler(config)
-        
+
         # Fail twice, then succeed
         mock_func = AsyncMock(side_effect=[ValueError("fail1"), ValueError("fail2"), "success"])
 
-        with patch('asyncio.sleep') as mock_sleep:
+        with patch("asyncio.sleep") as mock_sleep:
             result = await handler.execute_async(mock_func)
 
         assert result == "success"
@@ -413,7 +393,7 @@ class TestRetryHandler:
         handler = RetryHandler(config)
         mock_func = AsyncMock(side_effect=ValueError("always fails"))
 
-        with patch('asyncio.sleep') as mock_sleep:
+        with patch("asyncio.sleep") as mock_sleep:
             with pytest.raises(ValueError, match="always fails"):
                 await handler.execute_async(mock_func)
 
@@ -427,20 +407,17 @@ class TestRetryHandler:
     async def test_execute_async_with_retry_callback(self):
         """Test async execution with retry callback."""
         callback_calls = []
-        
+
         def on_retry_callback(exc, attempt):
             callback_calls.append((str(exc), attempt))
 
         config = RetryConfig(
-            max_attempts=3,
-            initial_delay=0.01,
-            on_retry=on_retry_callback,
-            jitter=False
+            max_attempts=3, initial_delay=0.01, on_retry=on_retry_callback, jitter=False
         )
         handler = RetryHandler(config)
         mock_func = AsyncMock(side_effect=[ValueError("fail1"), ValueError("fail2"), "success"])
 
-        with patch('asyncio.sleep'):
+        with patch("asyncio.sleep"):
             result = await handler.execute_async(mock_func)
 
         assert result == "success"
@@ -464,11 +441,11 @@ class TestRetryHandler:
         """Test sync execution with retries."""
         config = RetryConfig(max_attempts=3, initial_delay=0.01, jitter=False)
         handler = RetryHandler(config)
-        
+
         # Fail twice, then succeed
         mock_func = Mock(side_effect=[ValueError("fail1"), ValueError("fail2"), "success"])
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             result = handler.execute_sync(mock_func)
 
         assert result == "success"
@@ -484,7 +461,7 @@ class TestRetryHandler:
         handler = RetryHandler(config)
         mock_func = Mock(side_effect=ValueError("always fails"))
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             with pytest.raises(ValueError, match="always fails"):
                 handler.execute_sync(mock_func)
 
@@ -501,7 +478,7 @@ class TestRetryDecorator:
     async def test_async_function_decorator(self):
         """Test retry decorator on async function."""
         call_count = 0
-        
+
         @retry(max_attempts=3, initial_delay=0.01, jitter=False)
         async def test_func():
             nonlocal call_count
@@ -510,7 +487,7 @@ class TestRetryDecorator:
                 raise ValueError(f"attempt {call_count}")
             return "success"
 
-        with patch('asyncio.sleep'):
+        with patch("asyncio.sleep"):
             result = await test_func()
 
         assert result == "success"
@@ -519,7 +496,7 @@ class TestRetryDecorator:
     def test_sync_function_decorator(self):
         """Test retry decorator on sync function."""
         call_count = 0
-        
+
         @retry(max_attempts=3, initial_delay=0.01, jitter=False)
         def test_func():
             nonlocal call_count
@@ -528,7 +505,7 @@ class TestRetryDecorator:
                 raise ValueError(f"attempt {call_count}")
             return "success"
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             result = test_func()
 
         assert result == "success"
@@ -536,13 +513,14 @@ class TestRetryDecorator:
 
     def test_decorator_with_arguments(self):
         """Test retry decorator with function arguments."""
+
         @retry(max_attempts=2, initial_delay=0.01, jitter=False)
         def test_func(x, y, z=None):
             if x < 0:
                 raise ValueError("negative")
             return x + y + (z or 0)
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             result = test_func(1, 2, z=3)
 
         assert result == 6
@@ -551,13 +529,13 @@ class TestRetryDecorator:
     async def test_decorator_custom_config(self):
         """Test retry decorator with custom configuration."""
         call_count = 0
-        
+
         @retry(
             max_attempts=5,
             initial_delay=0.02,
             strategy=BackoffStrategy.LINEAR,
             retry_on=ValueError,
-            jitter=False
+            jitter=False,
         )
         async def test_func():
             nonlocal call_count
@@ -566,7 +544,7 @@ class TestRetryDecorator:
                 raise ValueError("retry me")
             return call_count
 
-        with patch('asyncio.sleep'):
+        with patch("asyncio.sleep"):
             result = await test_func()
 
         assert result == 4
@@ -574,6 +552,7 @@ class TestRetryDecorator:
 
     def test_decorator_non_retryable_exception(self):
         """Test decorator with non-retryable exception."""
+
         @retry(max_attempts=3, retry_on=ValueError)
         def test_func():
             raise TypeError("not retryable")
@@ -588,11 +567,11 @@ class TestConvenienceDecorators:
     def test_retry_on_network_error(self):
         """Test network error retry decorator."""
         decorator = retry_on_network_error(max_attempts=4)
-        
+
         # Should create proper retry configuration
         # Test by applying to a function and checking behavior
         call_count = 0
-        
+
         @decorator
         def test_func():
             nonlocal call_count
@@ -601,7 +580,7 @@ class TestConvenienceDecorators:
                 raise ConnectionError("network issue")
             return "connected"
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             result = test_func()
 
         assert result == "connected"
@@ -610,9 +589,9 @@ class TestConvenienceDecorators:
     def test_retry_on_timeout(self):
         """Test timeout retry decorator."""
         decorator = retry_on_timeout(max_attempts=3, timeout_delay=2.0)
-        
+
         call_count = 0
-        
+
         @decorator
         def test_func():
             nonlocal call_count
@@ -621,7 +600,7 @@ class TestConvenienceDecorators:
                 raise TimeoutError("timeout")
             return "completed"
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             result = test_func()
 
         assert result == "completed"
@@ -634,9 +613,9 @@ class TestConvenienceDecorators:
     def test_retry_with_fibonacci(self):
         """Test Fibonacci retry decorator."""
         decorator = retry_with_fibonacci(max_attempts=4)
-        
+
         call_count = 0
-        
+
         @decorator
         def test_func():
             nonlocal call_count
@@ -645,7 +624,7 @@ class TestConvenienceDecorators:
                 raise Exception("fail")
             return "success"
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             result = test_func()
 
         assert result == "success"
@@ -654,9 +633,9 @@ class TestConvenienceDecorators:
     def test_retry_with_decorrelated_jitter(self):
         """Test decorrelated jitter retry decorator."""
         decorator = retry_with_decorrelated_jitter(max_attempts=3)
-        
+
         call_count = 0
-        
+
         @decorator
         def test_func():
             nonlocal call_count
@@ -665,7 +644,7 @@ class TestConvenienceDecorators:
                 raise Exception("fail")
             return "success"
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             result = test_func()
 
         assert result == "success"
@@ -693,9 +672,9 @@ class TestRetryManager:
     def test_create_handler(self):
         """Test creating retry handler."""
         manager = RetryManager()
-        
+
         handler = manager.create_handler("test")
-        
+
         assert isinstance(handler, RetryHandler)
         assert "test" in manager._handlers
         assert manager._handlers["test"] == handler
@@ -704,47 +683,47 @@ class TestRetryManager:
         """Test creating handler with custom config."""
         manager = RetryManager()
         config = RetryConfig(max_attempts=10)
-        
+
         handler = manager.create_handler("test", config)
-        
+
         assert handler.config == config
         assert handler.config.max_attempts == 10
 
     def test_create_handler_reuse_existing(self):
         """Test that create_handler reuses existing handlers."""
         manager = RetryManager()
-        
+
         handler1 = manager.create_handler("test")
         handler2 = manager.create_handler("test")
-        
+
         assert handler1 is handler2
 
     def test_get_handler(self):
         """Test getting retry handler."""
         manager = RetryManager()
-        
+
         # Non-existent handler
         assert manager.get_handler("nonexistent") is None
-        
+
         # Existing handler
         created_handler = manager.create_handler("test")
         retrieved_handler = manager.get_handler("test")
-        
+
         assert retrieved_handler is created_handler
 
     def test_get_stats(self):
         """Test getting statistics for all handlers."""
         manager = RetryManager()
-        
+
         # Create handlers and simulate some activity
         handler1 = manager.create_handler("handler1")
         handler2 = manager.create_handler("handler2")
-        
+
         handler1.stats.record_attempt(True, retries=1)
         handler2.stats.record_attempt(False, retries=2)
-        
+
         stats = manager.get_stats()
-        
+
         assert "handler1" in stats
         assert "handler2" in stats
         assert stats["handler1"]["total_attempts"] == 1
@@ -755,16 +734,16 @@ class TestRetryManager:
     def test_reset_stats(self):
         """Test resetting statistics for all handlers."""
         manager = RetryManager()
-        
+
         # Create handler and add some stats
         handler = manager.create_handler("test")
         handler.stats.record_attempt(True, retries=1)
-        
+
         assert handler.stats.total_attempts == 1
-        
+
         # Reset stats
         manager.reset_stats()
-        
+
         assert handler.stats.total_attempts == 0
 
 
@@ -774,20 +753,20 @@ class TestGlobalRetryManager:
     def test_get_retry_handler(self):
         """Test getting retry handler from global manager."""
         handler = get_retry_handler("global_test")
-        
+
         assert isinstance(handler, RetryHandler)
 
     def test_get_retry_handler_with_config(self):
         """Test getting handler with custom config from global manager."""
         config = RetryConfig(max_attempts=7)
         handler = get_retry_handler("global_test_config", config)
-        
+
         assert handler.config.max_attempts == 7
 
     def test_get_retry_manager(self):
         """Test getting global retry manager."""
         manager = get_retry_manager()
-        
+
         assert isinstance(manager, RetryManager)
 
 
@@ -802,7 +781,7 @@ class TestEdgeCases:
 
         # Should not execute function at all
         result = handler.execute_sync(mock_func)
-        
+
         # Function should not be called and result should be None
         assert mock_func.call_count == 0
         assert result is None
@@ -822,7 +801,7 @@ class TestEdgeCases:
             initial_delay=1000.0,
             exponential_base=10.0,
             max_delay=5000.0,
-            jitter=False
+            jitter=False,
         )
         handler = RetryHandler(config)
 
@@ -832,20 +811,18 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_exception_in_retry_callback(self):
         """Test handling of exceptions in retry callback."""
+
         def failing_callback(exc, attempt):
             raise RuntimeError("callback failed")
 
         config = RetryConfig(
-            max_attempts=3,
-            initial_delay=0.01,
-            on_retry=failing_callback,
-            jitter=False
+            max_attempts=3, initial_delay=0.01, on_retry=failing_callback, jitter=False
         )
         handler = RetryHandler(config)
         mock_func = AsyncMock(side_effect=[ValueError("fail"), "success"])
 
         # Callback exception should not prevent retry logic
-        with patch('asyncio.sleep'):
+        with patch("asyncio.sleep"):
             with pytest.raises(RuntimeError):  # Callback exception propagates
                 await handler.execute_async(mock_func)
 
@@ -864,7 +841,7 @@ class TestEdgeCases:
     async def test_async_function_with_sync_handler(self):
         """Test calling async function with sync execute method."""
         handler = RetryHandler()
-        
+
         async def async_func():
             return "async result"
 
@@ -887,10 +864,10 @@ class TestEdgeCases:
         # Disable jitter for exact comparison
         config = RetryConfig(jitter=False)
         handler = RetryHandler(config)
-        
+
         # Temporarily modify strategy to unknown value
         handler.config.strategy = "unknown_strategy"
-        
+
         # Should fall back to initial_delay
         delay = handler.calculate_delay(0)
         assert delay == handler.config.initial_delay
@@ -918,13 +895,13 @@ class TestLoggingBehavior:
         handler = RetryHandler(config)
         mock_func = AsyncMock(side_effect=[ValueError("fail1"), ValueError("fail2"), "success"])
 
-        with patch('asyncio.sleep'):
-            with patch('src.utils.retry.logger') as mock_logger:
+        with patch("asyncio.sleep"):
+            with patch("src.utils.retry.logger") as mock_logger:
                 result = await handler.execute_async(mock_func)
 
         assert result == "success"
         assert mock_logger.warning.call_count == 2
-        
+
         # Check warning messages
         warning_calls = mock_logger.warning.call_args_list
         assert "Retry attempt 1/3" in warning_calls[0][0][0]
@@ -937,8 +914,8 @@ class TestLoggingBehavior:
         handler = RetryHandler(config)
         mock_func = AsyncMock(side_effect=ValueError("always fails"))
 
-        with patch('asyncio.sleep'):
-            with patch('src.utils.retry.logger') as mock_logger:
+        with patch("asyncio.sleep"):
+            with patch("src.utils.retry.logger") as mock_logger:
                 with pytest.raises(ValueError):
                     await handler.execute_async(mock_func)
 

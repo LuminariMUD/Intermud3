@@ -233,8 +233,6 @@ class CircuitBreaker(Generic[T]):
 class CircuitOpenError(Exception):
     """Exception raised when circuit breaker is open."""
 
-    pass
-
 
 class CircuitBreakerManager:
     """Manager for multiple circuit breakers."""

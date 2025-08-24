@@ -1,6 +1,5 @@
 """Configuration models for I3 Gateway."""
 
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 

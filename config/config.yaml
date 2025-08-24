@@ -2,13 +2,13 @@
 # This file defines the default configuration for the I3 Gateway
 
 mud:
-  name: ${MUD_NAME:TestMUD}
-  port: ${MUD_PORT:4000}
-  admin_email: ${MUD_ADMIN_EMAIL:admin@testmud.com}
-  mudlib: "Custom"
-  base_mudlib: "LPMud"
-  driver: "FluffOS"
-  mud_type: ${MUD_TYPE:LP}
+  name: ${MUD_NAME:LuminariMUD}
+  port: ${MUD_PORT:4100}
+  admin_email: ${MUD_ADMIN_EMAIL:max@aiwithapex.com}
+  mudlib: "LuminariMUD"
+  base_mudlib: "CircleMUD/tbaMUD/d20MUD"
+  driver: "CircleMUD"
+  mud_type: ${MUD_TYPE:Circle}
   open_status: ${MUD_STATUS:open}
   
   # Service capabilities (1 = enabled, 0 = disabled)

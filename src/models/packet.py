@@ -12,8 +12,6 @@ from typing import Any
 class PacketValidationError(Exception):
     """Raised when packet validation fails."""
 
-    pass
-
 
 class PacketType(Enum):
     """I3 packet types."""
@@ -95,13 +93,11 @@ class I3Packet(ABC):
     @abstractmethod
     def to_lpc_array(self) -> list[Any]:
         """Convert packet to LPC array format for transmission."""
-        pass
 
     @classmethod
     @abstractmethod
     def from_lpc_array(cls, data: list[Any]) -> "I3Packet":
         """Create packet from LPC array received from network."""
-        pass
 
     def get_reply_packet(self, **kwargs) -> "I3Packet":
         """Create a reply packet with swapped addresses.
@@ -127,7 +123,7 @@ class I3Packet(ABC):
 @dataclass
 class TellPacket(I3Packet):
     """Private message packet.
-    
+
     IMPORTANT: According to official I3 protocol documentation:
     - Tell packets MUST have a visname field (visual name of originator)
     - The LPC array format is: [type, ttl, orig_mud, orig_user, target_mud, target_user, visname, message]
@@ -154,7 +150,7 @@ class TellPacket(I3Packet):
 
         if not self.message:
             raise PacketValidationError("Tell requires a message")
-        
+
         # CRITICAL: visname is REQUIRED - Tell packets MUST have 8 fields
         # If not provided, it defaults to originator_user
         # See docs/intermud3_docs/VISNAME_CLARIFICATION.md
@@ -163,7 +159,7 @@ class TellPacket(I3Packet):
 
     def to_lpc_array(self) -> list[Any]:
         """Convert to LPC array.
-        
+
         CRITICAL: Tell packets have EXACTLY 8 FIELDS - NOT 7!
         Position 0: packet type ("tell")
         Position 1: TTL
@@ -191,7 +187,7 @@ class TellPacket(I3Packet):
     @classmethod
     def from_lpc_array(cls, data: list[Any]) -> "TellPacket":
         """Create from LPC array.
-        
+
         CRITICAL: Tell packets have EXACTLY 8 FIELDS - NOT 7!
         Position 6 is visname - REQUIRED by I3 protocol.
         See docs/intermud3_docs/VISNAME_CLARIFICATION.md
@@ -213,7 +209,7 @@ class TellPacket(I3Packet):
 @dataclass
 class EmotetoPacket(I3Packet):
     """Emote packet (similar to tell but for emotes).
-    
+
     CRITICAL: Emoteto packets have EXACTLY 8 FIELDS - same as tell packets!
     - The LPC array format is: [type, ttl, orig_mud, orig_user, target_mud, target_user, visname, message]
     - Position 6 is visname - REQUIRED field that defaults to originator_user
@@ -249,7 +245,7 @@ class EmotetoPacket(I3Packet):
 
     def to_lpc_array(self) -> list[Any]:
         """Convert to LPC array.
-        
+
         CRITICAL: Emoteto packets have EXACTLY 8 FIELDS - NOT 7!
         Position 6 is visname - REQUIRED by I3 protocol.
         See docs/intermud3_docs/VISNAME_CLARIFICATION.md
@@ -270,7 +266,7 @@ class EmotetoPacket(I3Packet):
     @classmethod
     def from_lpc_array(cls, data: list[Any]) -> "EmotetoPacket":
         """Create from LPC array.
-        
+
         CRITICAL: Emoteto packets have EXACTLY 8 FIELDS - NOT 7!
         Position 6 is visname - REQUIRED by I3 protocol.
         See docs/intermud3_docs/VISNAME_CLARIFICATION.md
@@ -361,7 +357,7 @@ class LocatePacket(I3Packet):
             originator_user=str(data[3]) if data[3] and data[3] != 0 else "",
             target_mud=str(data[4]) if data[4] and data[4] != 0 else "",
             target_user=str(data[5]) if data[5] and data[5] != 0 else "",
-            **extra_fields
+            **extra_fields,
         )
 
         return packet

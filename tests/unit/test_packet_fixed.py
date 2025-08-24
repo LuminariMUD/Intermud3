@@ -1,31 +1,25 @@
 """Unit tests for I3 packet models - with protocol fixes."""
 
 import pytest
+
 from src.models.packet import (
-    I3Packet,
-    PacketType,
-    TellPacket,
     EmotetoPacket,
     LocatePacket,
-    ChannelPacket,
-    WhoPacket,
-    FingerPacket,
+    PacketFactory,
+    PacketType,
     StartupPacket,
     StartupReplyPacket,
-    MudlistPacket,
-    ErrorPacket,
-    PacketFactory,
-    PacketValidationError
+    TellPacket,
 )
 
 
 class TestTellPacketFixed:
     """Test fixed TellPacket with visname field.
-    
+
     CRITICAL: Tell packets have EXACTLY 8 FIELDS with visname at position 6!
     See docs/intermud3_docs/VISNAME_CLARIFICATION.md
     """
-    
+
     def test_tell_packet_with_visname(self):
         """Test tell packet structure - visname is REQUIRED."""
         packet = TellPacket(
@@ -34,15 +28,15 @@ class TestTellPacketFixed:
             originator_user="testuser",
             target_mud="TargetMUD",
             target_user="targetuser",
-            message="Hello, World!"
+            message="Hello, World!",
         )
-        
+
         lpc_array = packet.to_lpc_array()
         # CRITICAL: Tell packets have 8 fields WITH visname
         assert len(lpc_array) == 8  # MUST have 8 fields with visname
         assert lpc_array[6] == "testuser"  # visname at position 6 (defaults to originator_user)
         assert lpc_array[7] == "Hello, World!"  # message at position 7
-    
+
     def test_tell_packet_visname_defaults(self):
         """Test tell packet visname defaults to originator_user."""
         packet = TellPacket(
@@ -51,15 +45,15 @@ class TestTellPacketFixed:
             originator_user="testuser",
             target_mud="TargetMUD",
             target_user="targetuser",
-            message="Hello!"
+            message="Hello!",
         )
-        
+
         # Validate packet structure
         packet.validate()
         assert packet.originator_user == "testuser"
         # CRITICAL: visname defaults to originator_user
         assert packet.visname == "testuser"
-    
+
     def test_tell_packet_field_zero_handling(self):
         """Test that tell packet requires target_user."""
         # TellPacket now requires target_user, test valid packet
@@ -69,18 +63,18 @@ class TestTellPacketFixed:
             originator_user="testuser",
             target_mud="TargetMUD",
             target_user="targetuser",
-            message="Message"
+            message="Message",
         )
-        
+
         lpc_array = packet.to_lpc_array()
         assert lpc_array[4] == "TargetMUD"  # target_mud
         assert lpc_array[5] == "targetuser"  # target_user
         assert lpc_array[6] == "testuser"  # visname defaults to originator_user
         assert lpc_array[7] == "Message"  # message at position 7
-    
+
     def test_tell_packet_from_lpc_with_zeros(self):
         """Test creating packet from LPC array.
-        
+
         CRITICAL: Tell packets have EXACTLY 8 FIELDS!
         See docs/intermud3_docs/VISNAME_CLARIFICATION.md
         """
@@ -91,10 +85,10 @@ class TestTellPacketFixed:
             "testuser",
             "TargetMUD",
             "targetuser",  # Required field
-            "testuser",    # Position 6: visname (REQUIRED)
-            "Message"       # Position 7: message
+            "testuser",  # Position 6: visname (REQUIRED)
+            "Message",  # Position 7: message
         ]
-        
+
         packet = TellPacket.from_lpc_array(lpc_array)
         assert packet.target_mud == "TargetMUD"
         assert packet.target_user == "targetuser"
@@ -102,7 +96,7 @@ class TestTellPacketFixed:
 
 class TestEmotetoPacket:
     """Test EmotetoPacket functionality."""
-    
+
     def test_create_emoteto_packet(self):
         """Test creating emoteto packet."""
         packet = EmotetoPacket(
@@ -112,13 +106,13 @@ class TestEmotetoPacket:
             target_mud="TargetMUD",
             target_user="targetuser",
             visname="TestUser",
-            message="smiles warmly"
+            message="smiles warmly",
         )
-        
+
         assert packet.packet_type == PacketType.EMOTETO
         assert packet.visname == "TestUser"
         assert packet.message == "smiles warmly"
-        
+
         lpc_array = packet.to_lpc_array()
         assert lpc_array[0] == "emoteto"
         assert len(lpc_array) == 8
@@ -126,7 +120,7 @@ class TestEmotetoPacket:
 
 class TestLocatePacket:
     """Test LocatePacket functionality."""
-    
+
     def test_create_locate_request(self):
         """Test creating locate request packet."""
         packet = LocatePacket(
@@ -136,17 +130,17 @@ class TestLocatePacket:
             originator_user="seeker",
             target_mud="",  # Broadcast
             target_user="",
-            user_to_locate="lostuser"
+            user_to_locate="lostuser",
         )
-        
+
         assert packet.packet_type == PacketType.LOCATE_REQ
         assert packet.user_to_locate == "lostuser"
-        
+
         lpc_array = packet.to_lpc_array()
         assert lpc_array[0] == "locate-req"
         assert lpc_array[4] == 0  # Broadcast
         assert lpc_array[6] == "lostuser"
-    
+
     def test_create_locate_reply(self):
         """Test creating locate reply packet."""
         packet = LocatePacket(
@@ -159,13 +153,13 @@ class TestLocatePacket:
             located_mud="FoundMUD",
             located_user="lostuser",
             idle_time=300,
-            status_string="In the tavern"
+            status_string="In the tavern",
         )
-        
+
         assert packet.packet_type == PacketType.LOCATE_REPLY
         assert packet.located_mud == "FoundMUD"
         assert packet.idle_time == 300
-        
+
         lpc_array = packet.to_lpc_array()
         assert lpc_array[0] == "locate-reply"
         assert len(lpc_array) == 10
@@ -173,7 +167,7 @@ class TestLocatePacket:
 
 class TestStartupPacketFixed:
     """Test fixed StartupPacket with correct field order."""
-    
+
     def test_startup_packet_field_order(self):
         """Test startup packet has correct field order per protocol."""
         packet = StartupPacket(
@@ -194,11 +188,11 @@ class TestStartupPacketFixed:
             mud_type="LP",
             open_status="open for public",
             admin_email="admin@test.mud",
-            services={"tell": 1, "channel": 1}
+            services={"tell": 1, "channel": 1},
         )
-        
+
         lpc_array = packet.to_lpc_array()
-        
+
         # Check field positions match protocol
         assert lpc_array[0] == "startup-req-3"
         assert lpc_array[1] == 200  # TTL
@@ -219,31 +213,24 @@ class TestStartupPacketFixed:
         assert lpc_array[16] == "open for public"  # open_status
         assert lpc_array[17] == "admin@test.mud"  # admin_email
         assert lpc_array[18] == {"tell": 1, "channel": 1}  # services
-        
+
     def test_startup_packet_other_data_as_zero(self):
         """Test other_data can be 0 instead of empty dict."""
         packet = StartupPacket(
-            ttl=200,
-            originator_mud="TestMUD",
-            originator_user="",
-            target_mud="*i3",
-            target_user=""
+            ttl=200, originator_mud="TestMUD", originator_user="", target_mud="*i3", target_user=""
         )
-        
+
         lpc_array = packet.to_lpc_array()
         assert lpc_array[19] == 0  # other_data becomes 0 when empty
 
 
 class TestStartupReplyPacket:
     """Test StartupReplyPacket functionality."""
-    
+
     def test_create_startup_reply(self):
         """Test creating startup reply packet."""
-        router_list = [
-            ["*i3", "204.209.44.3 8080"],
-            ["*wpr", "195.242.99.94 8080"]
-        ]
-        
+        router_list = [["*i3", "204.209.44.3 8080"], ["*wpr", "195.242.99.94 8080"]]
+
         packet = StartupReplyPacket(
             ttl=200,
             originator_mud="*i3",
@@ -251,13 +238,13 @@ class TestStartupReplyPacket:
             target_mud="TestMUD",
             target_user="",
             router_list=router_list,
-            password=67890
+            password=67890,
         )
-        
+
         assert packet.packet_type == PacketType.STARTUP_REPLY
         assert packet.router_list == router_list
         assert packet.password == 67890
-        
+
         lpc_array = packet.to_lpc_array()
         assert lpc_array[0] == "startup-reply"
         assert lpc_array[6] == router_list
@@ -266,7 +253,7 @@ class TestStartupReplyPacket:
 
 class TestPacketFactoryFixed:
     """Test PacketFactory with fixed packet types."""
-    
+
     def test_create_emoteto_packet(self):
         """Test factory creates EmotetoPacket correctly."""
         lpc_array = [
@@ -277,30 +264,22 @@ class TestPacketFactoryFixed:
             "TargetMUD",
             "targetuser",
             "TestUser",
-            "grins"
+            "grins",
         ]
-        
+
         packet = PacketFactory.create_packet(lpc_array)
         assert isinstance(packet, EmotetoPacket)
         assert packet.message == "grins"
-    
+
     def test_create_locate_packets(self):
         """Test factory creates LocatePacket correctly."""
         # locate-req
-        req_array = [
-            "locate-req",
-            200,
-            "TestMUD",
-            "seeker",
-            0,  # broadcast
-            0,
-            "findme"
-        ]
-        
+        req_array = ["locate-req", 200, "TestMUD", "seeker", 0, 0, "findme"]  # broadcast
+
         packet = PacketFactory.create_packet(req_array)
         assert isinstance(packet, LocatePacket)
         assert packet.user_to_locate == "findme"
-        
+
         # locate-reply
         reply_array = [
             "locate-reply",
@@ -312,13 +291,13 @@ class TestPacketFactoryFixed:
             "FoundMUD",
             "findme",
             120,
-            "At the shop"
+            "At the shop",
         ]
-        
+
         packet = PacketFactory.create_packet(reply_array)
         assert isinstance(packet, LocatePacket)
         assert packet.located_user == "findme"
-    
+
     def test_create_startup_reply_packet(self):
         """Test factory creates StartupReplyPacket correctly."""
         lpc_array = [
@@ -329,9 +308,9 @@ class TestPacketFactoryFixed:
             "TestMUD",
             0,
             [["*i3", "204.209.44.3 8080"]],
-            54321
+            54321,
         ]
-        
+
         packet = PacketFactory.create_packet(lpc_array)
         assert isinstance(packet, StartupReplyPacket)
         assert packet.password == 54321

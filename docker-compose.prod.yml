@@ -17,6 +17,19 @@ services:
           memory: 256M
     environment:
       - LOG_LEVEL=WARNING
+      - MUD_NAME=LuminariMUD
+      - MUD_PORT=4100
+      - MUD_TYPE=Circle
+      - MUD_ADMIN_EMAIL=${MUD_ADMIN_EMAIL:-max@aiwithapex.com}
+      - API_AUTH_ENABLED=true
+      - API_KEY_LUMINARI=${API_KEY_LUMINARI}
+      - I3_GATEWAY_SECRET=${I3_GATEWAY_SECRET}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     logging:
       driver: "json-file"
       options:

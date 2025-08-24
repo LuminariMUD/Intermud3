@@ -76,7 +76,6 @@ class BaseService(ABC):
         Returns:
             Optional response packet to send back
         """
-        pass
 
     @abstractmethod
     async def validate_packet(self, packet: I3Packet) -> bool:
@@ -88,7 +87,6 @@ class BaseService(ABC):
         Returns:
             True if the packet is valid for this service
         """
-        pass
 
     async def process_packet(self, packet: I3Packet) -> I3Packet | None:
         """Process a packet with validation and metrics.

@@ -3,11 +3,11 @@
 import asyncio
 import sys
 from pathlib import Path
-from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 import pytest_asyncio
+
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -92,7 +92,7 @@ async def mock_gateway_config():
                 "who": 1,
                 "finger": 1,
                 "locate": 1,
-            }
+            },
         },
         "router": {
             "primary": {
@@ -101,7 +101,7 @@ async def mock_gateway_config():
             },
             "fallback": [
                 {"host": "backup.router.i3", "port": 8080},
-            ]
+            ],
         },
         "gateway": {
             "host": "localhost",
@@ -115,7 +115,7 @@ async def mock_gateway_config():
             "level": "DEBUG",
             "format": "json",
             "file": "logs/i3-gateway.log",
-        }
+        },
     }
 
 
@@ -152,7 +152,7 @@ def temp_state_dir(tmp_path):
 def temp_config_file(tmp_path):
     """Create temporary config file for testing."""
     import yaml
-    
+
     config_file = tmp_path / "config.yaml"
     config_data = {
         "mud": {
@@ -164,12 +164,12 @@ def temp_config_file(tmp_path):
                 "host": "test.router.i3",
                 "port": 8080,
             }
-        }
+        },
     }
-    
+
     with open(config_file, "w") as f:
         yaml.dump(config_data, f)
-    
+
     return config_file
 
 
@@ -196,18 +196,10 @@ def mock_logger():
 # Markers for test organization
 def pytest_configure(config):
     """Configure custom pytest markers."""
-    config.addinivalue_line(
-        "markers", "unit: Unit tests that don't require external resources"
-    )
+    config.addinivalue_line("markers", "unit: Unit tests that don't require external resources")
     config.addinivalue_line(
         "markers", "integration: Integration tests that may require external resources"
     )
-    config.addinivalue_line(
-        "markers", "slow: Tests that take a long time to run"
-    )
-    config.addinivalue_line(
-        "markers", "network: Tests that require network access"
-    )
-    config.addinivalue_line(
-        "markers", "asyncio: Asynchronous tests"
-    )
+    config.addinivalue_line("markers", "slow: Tests that take a long time to run")
+    config.addinivalue_line("markers", "network: Tests that require network access")
+    config.addinivalue_line("markers", "asyncio: Asynchronous tests")

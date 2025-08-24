@@ -53,9 +53,7 @@ def handle_signal(sig: int, gateway: I3Gateway | None) -> None:
 )
 @click.option("--dry-run", is_flag=True, help="Validate configuration without starting the gateway")
 @click.version_option()
-def main(
-    config: Path, env_file: Path, debug: bool, log_level: str | None, dry_run: bool
-) -> None:
+def main(config: Path, env_file: Path, debug: bool, log_level: str | None, dry_run: bool) -> None:
     """I3 Gateway - Intermud3 Protocol Gateway Service.
 
     This service acts as a bridge between MUDs and the global Intermud-3 network,
@@ -84,6 +82,7 @@ def main(
     )
 
     from src import __version__
+
     logger.info(
         "Starting I3 Gateway",
         version=__version__,
@@ -100,11 +99,11 @@ def main(
     # Create and run gateway
     loop = None
     gateway = None
-    
+
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
+
         gateway = I3Gateway(settings)
 
         # Setup signal handlers

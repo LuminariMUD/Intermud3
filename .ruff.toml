@@ -137,7 +137,7 @@ datetime = "dt"
 numpy = "np"
 pandas = "pd"
 matplotlib = "mpl"
-matplotlib.pyplot = "plt"
+"matplotlib.pyplot" = "plt"
 seaborn = "sns"
 
 [format]

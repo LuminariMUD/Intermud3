@@ -1,17 +1,13 @@
 """Comprehensive unit tests for state manager."""
 
 import asyncio
-import json
 import time
-import uuid
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
-from unittest import mock
+from unittest.mock import patch
 
 import pytest
 
-from src.models.connection import ChannelInfo, MudInfo, MudStatus, UserSession
+from src.models.connection import ChannelInfo, MudInfo, MudStatus
 from src.state.manager import StateManager, TTLCache
 
 
@@ -49,7 +45,7 @@ class TestTTLCache:
     async def test_get_nonexistent_item(self):
         """Test getting non-existent cache item."""
         cache = TTLCache()
-        
+
         result = await cache.get("nonexistent")
         assert result is None
 
@@ -59,14 +55,14 @@ class TestTTLCache:
         cache = TTLCache(default_ttl=0.1)  # 100ms TTL
 
         await cache.set("expire_key", "expire_value")
-        
+
         # Should exist immediately
         result = await cache.get("expire_key")
         assert result == "expire_value"
 
         # Wait for expiration
         await asyncio.sleep(0.15)
-        
+
         # Should be expired
         result = await cache.get("expire_key")
         assert result is None
@@ -77,7 +73,7 @@ class TestTTLCache:
         cache = TTLCache()
 
         await cache.set("delete_key", "delete_value")
-        
+
         # Verify exists
         result = await cache.get("delete_key")
         assert result == "delete_value"
@@ -197,12 +193,44 @@ class TestStateManager:
 
         # Test update_mudlist - need at least 15 elements for update_from_mudlist
         mudlist_data = {
-            "TestMUD1": ["192.168.1.100", 4000, 5000, 6000, "TestLib", "BaseLib", "Driver", "LP", "open", "admin@test.com", {"tell": 1, "channel": 1}, {}, "", "", ""],
-            "TestMUD2": ["192.168.1.101", 4001, 5001, 6001, "TestLib2", "BaseLib2", "Driver2", "LP", "closed", "admin2@test.com", {"tell": 1}, {}, "", "", ""]
+            "TestMUD1": [
+                "192.168.1.100",
+                4000,
+                5000,
+                6000,
+                "TestLib",
+                "BaseLib",
+                "Driver",
+                "LP",
+                "open",
+                "admin@test.com",
+                {"tell": 1, "channel": 1},
+                {},
+                "",
+                "",
+                "",
+            ],
+            "TestMUD2": [
+                "192.168.1.101",
+                4001,
+                5001,
+                6001,
+                "TestLib2",
+                "BaseLib2",
+                "Driver2",
+                "LP",
+                "closed",
+                "admin2@test.com",
+                {"tell": 1},
+                {},
+                "",
+                "",
+                "",
+            ],
         }
 
         await manager.update_mudlist(mudlist_data, 123)
-        
+
         assert manager.mudlist_id == 123
         assert len(manager.mudlist) == 2
         assert "TestMUD1" in manager.mudlist
@@ -235,13 +263,45 @@ class TestStateManager:
 
         # Initial mudlist - need at least 15 elements
         initial_data = {
-            "TestMUD": ["192.168.1.100", 4000, 5000, 6000, "TestLib", "BaseLib", "Driver", "LP", "open", "admin@test.com", {"tell": 1}, {}, "", "", ""]
+            "TestMUD": [
+                "192.168.1.100",
+                4000,
+                5000,
+                6000,
+                "TestLib",
+                "BaseLib",
+                "Driver",
+                "LP",
+                "open",
+                "admin@test.com",
+                {"tell": 1},
+                {},
+                "",
+                "",
+                "",
+            ]
         }
         await manager.update_mudlist(initial_data, 1)
 
         # Update with new data - need at least 15 elements
         updated_data = {
-            "TestMUD": ["192.168.1.200", 4001, 5001, 6001, "NewLib", "NewBase", "NewDriver", "LPC", "closed", "new@test.com", {"tell": 1, "channel": 1}, {}, "", "", ""]
+            "TestMUD": [
+                "192.168.1.200",
+                4001,
+                5001,
+                6001,
+                "NewLib",
+                "NewBase",
+                "NewDriver",
+                "LPC",
+                "closed",
+                "new@test.com",
+                {"tell": 1, "channel": 1},
+                {},
+                "",
+                "",
+                "",
+            ]
         }
         await manager.update_mudlist(updated_data, 2)
 
@@ -258,7 +318,7 @@ class TestStateManager:
         # Initial mudlist with two MUDs - need at least 15 elements
         initial_data = {
             "MUD1": ["192.168.1.100", 4000, 5000, 6000, "", "", "", "", "", "", {}, {}, "", "", ""],
-            "MUD2": ["192.168.1.101", 4001, 5001, 6001, "", "", "", "", "", "", {}, {}, "", "", ""]
+            "MUD2": ["192.168.1.101", 4001, 5001, 6001, "", "", "", "", "", "", {}, {}, "", "", ""],
         }
         await manager.update_mudlist(initial_data, 1)
 
@@ -307,7 +367,7 @@ class TestStateManager:
         assert result1 == mud_info
 
         # Second call should use cache
-        with patch.object(manager.cache, 'get', return_value=mud_info) as mock_cache_get:
+        with patch.object(manager.cache, "get", return_value=mud_info) as mock_cache_get:
             result2 = await manager.get_mud_info("CacheMUD")
             assert result2 == mud_info
             mock_cache_get.assert_called_once_with("mud:CacheMUD")
@@ -344,7 +404,7 @@ class TestStateManager:
         chanlist_data = {
             "general": {"owner": "RouterMUD", "type": 0},
             "newbie": {"owner": "HelperMUD", "type": 1},
-            "admin": {"owner": "AdminMUD", "type": 2}
+            "admin": {"owner": "AdminMUD", "type": 2},
         }
 
         await manager.update_chanlist(chanlist_data, 456)
@@ -367,9 +427,7 @@ class TestStateManager:
         await manager.add_channel(existing)
 
         # Update with new data
-        chanlist_data = {
-            "existing": {"owner": "NewOwner", "type": 1}
-        }
+        chanlist_data = {"existing": {"owner": "NewOwner", "type": 1}}
         await manager.update_chanlist(chanlist_data, 1)
 
         updated = await manager.get_channel("existing")
@@ -430,7 +488,7 @@ class TestStateManager:
         old_session.last_activity = datetime.now() - timedelta(hours=2)
 
         active_sessions = await manager.get_active_sessions()
-        
+
         # Only recent session should be active (within 1 hour)
         assert len(active_sessions) == 1
         assert active_sessions[0].user_name == "recentuser"
@@ -538,7 +596,7 @@ class TestStateManager:
         recent_session = await manager.create_session("TestMUD", "recentuser")
 
         # Mock the periodic cleanup to run immediately
-        with patch.object(manager, '_periodic_cleanup') as mock_cleanup:
+        with patch.object(manager, "_periodic_cleanup") as mock_cleanup:
             # Make cleanup run once then exit
             async def mock_cleanup_impl():
                 # Clean up cache
@@ -558,10 +616,10 @@ class TestStateManager:
             mock_cleanup.side_effect = mock_cleanup_impl
 
             await manager.start()
-            
+
             # Manually run cleanup once
             await mock_cleanup_impl()
-            
+
             await manager.stop()
 
         # Old session should be cleaned up
@@ -574,9 +632,12 @@ class TestStateManager:
         manager = StateManager()
 
         # Mock cache cleanup to raise exception
-        with patch.object(manager.cache, 'cleanup', side_effect=RuntimeError("Cleanup error")):
-            with patch('asyncio.sleep') as mock_sleep:
-                mock_sleep.side_effect = [None, asyncio.CancelledError()]  # First sleep normal, second cancels
+        with patch.object(manager.cache, "cleanup", side_effect=RuntimeError("Cleanup error")):
+            with patch("asyncio.sleep") as mock_sleep:
+                mock_sleep.side_effect = [
+                    None,
+                    asyncio.CancelledError(),
+                ]  # First sleep normal, second cancels
 
                 await manager.start()
                 await asyncio.sleep(0.01)  # Let task run
@@ -668,13 +729,25 @@ class TestStateManager:
         # Add many MUDs
         mudlist_data = {}
         for i in range(1000):
-            mudlist_data[f"MUD_{i}"] = [f"192.168.{i//255}.{i%255}", 4000+i, 5000+i, 6000+i, "", "", "", "", "", "", {}]
+            mudlist_data[f"MUD_{i}"] = [
+                f"192.168.{i//255}.{i%255}",
+                4000 + i,
+                5000 + i,
+                6000 + i,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                {},
+            ]
 
         await manager.update_mudlist(mudlist_data, 1)
 
         # Verify data
         assert len(manager.mudlist) == 1000
-        
+
         # Test cache operations
         for i in range(0, 1000, 100):  # Sample every 100th
             mud_info = await manager.get_mud_info(f"MUD_{i}")
@@ -709,7 +782,7 @@ class TestStateManager:
         # Test with non-dict channel data (legacy format)
         chanlist_data = {
             "simple_channel": "simple_value",  # Not a dict
-            "dict_channel": {"owner": "TestMUD", "type": 1}
+            "dict_channel": {"owner": "TestMUD", "type": 1},
         }
 
         await manager.update_chanlist(chanlist_data, 1)
@@ -731,7 +804,23 @@ class TestStateManager:
         # Test with insufficient data
         mudlist_data = {
             "IncompleteMUD": ["192.168.1.1"],  # Too few elements
-            "CompleteMUD": ["192.168.1.2", 4000, 5000, 6000, "lib", "base", "driver", "type", "status", "email", {}, {}, "extra", "", ""]  # Complete with 15+ elements
+            "CompleteMUD": [
+                "192.168.1.2",
+                4000,
+                5000,
+                6000,
+                "lib",
+                "base",
+                "driver",
+                "type",
+                "status",
+                "email",
+                {},
+                {},
+                "extra",
+                "",
+                "",
+            ],  # Complete with 15+ elements
         }
 
         await manager.update_mudlist(mudlist_data, 1)
@@ -752,7 +841,7 @@ class TestStateManagerIntegration:
     async def test_full_lifecycle(self, tmp_path):
         """Test complete state manager lifecycle."""
         persistence_dir = tmp_path / "integration_state"
-        
+
         # Create and start manager
         manager = StateManager(persistence_dir=persistence_dir, cache_ttl=60.0)
         await manager.start()
@@ -760,15 +849,47 @@ class TestStateManagerIntegration:
         try:
             # Add MUDs - need at least 15 elements
             mudlist_data = {
-                "MUD1": ["1.1.1.1", 4000, 5000, 6000, "Lib1", "Base1", "Driver1", "LP", "open", "admin1@test.com", {"tell": 1}, {}, "", "", ""],
-                "MUD2": ["2.2.2.2", 4001, 5001, 6001, "Lib2", "Base2", "Driver2", "LPC", "closed", "admin2@test.com", {"channel": 1}, {}, "", "", ""]
+                "MUD1": [
+                    "1.1.1.1",
+                    4000,
+                    5000,
+                    6000,
+                    "Lib1",
+                    "Base1",
+                    "Driver1",
+                    "LP",
+                    "open",
+                    "admin1@test.com",
+                    {"tell": 1},
+                    {},
+                    "",
+                    "",
+                    "",
+                ],
+                "MUD2": [
+                    "2.2.2.2",
+                    4001,
+                    5001,
+                    6001,
+                    "Lib2",
+                    "Base2",
+                    "Driver2",
+                    "LPC",
+                    "closed",
+                    "admin2@test.com",
+                    {"channel": 1},
+                    {},
+                    "",
+                    "",
+                    "",
+                ],
             }
             await manager.update_mudlist(mudlist_data, 100)
 
             # Add channels
             chanlist_data = {
                 "general": {"owner": "MUD1", "type": 0},
-                "private": {"owner": "MUD2", "type": 2}
+                "private": {"owner": "MUD2", "type": 2},
             }
             await manager.update_chanlist(chanlist_data, 200)
 
@@ -825,10 +946,22 @@ class TestStateManagerIntegration:
         try:
             # This should not crash the manager
             mudlist_data = {
-                "ErrorMUD": [None, "invalid_port", [], {}, "lib", "base", "driver", "type", "status", "email", "invalid_services"]
+                "ErrorMUD": [
+                    None,
+                    "invalid_port",
+                    [],
+                    {},
+                    "lib",
+                    "base",
+                    "driver",
+                    "type",
+                    "status",
+                    "email",
+                    "invalid_services",
+                ]
             }
             await manager.update_mudlist(mudlist_data, 1)
-            
+
             # Should still be able to operate
             online_muds = await manager.get_online_muds()
             assert isinstance(online_muds, list)
@@ -850,10 +983,21 @@ class TestStateManagerIntegration:
             for i in range(100):
                 mud_id = batch * 100 + i
                 mudlist_data[f"MUD_{mud_id}"] = [
-                    f"192.168.{mud_id//255}.{mud_id%255}", 
-                    4000 + mud_id, 5000 + mud_id, 6000 + mud_id,
-                    f"Lib{mud_id}", f"Base{mud_id}", f"Driver{mud_id}", "LP", "open", 
-                    f"admin{mud_id}@test.com", {"tell": 1, "channel": 1}, {}, "", "", ""
+                    f"192.168.{mud_id//255}.{mud_id%255}",
+                    4000 + mud_id,
+                    5000 + mud_id,
+                    6000 + mud_id,
+                    f"Lib{mud_id}",
+                    f"Base{mud_id}",
+                    f"Driver{mud_id}",
+                    "LP",
+                    "open",
+                    f"admin{mud_id}@test.com",
+                    {"tell": 1, "channel": 1},
+                    {},
+                    "",
+                    "",
+                    "",
                 ]
             await manager.update_mudlist(mudlist_data, batch)
 
@@ -865,7 +1009,7 @@ class TestStateManagerIntegration:
 
         # Heavy channel operations
         for i in range(200):
-            channel = ChannelInfo(name=f"channel_{i}", owner=f"MUD_{i%100}", type=i%3)
+            channel = ChannelInfo(name=f"channel_{i}", owner=f"MUD_{i%100}", type=i % 3)
             await manager.add_channel(channel)
 
         end_time = time.time()

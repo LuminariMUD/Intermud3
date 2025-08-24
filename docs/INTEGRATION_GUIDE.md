@@ -1298,6 +1298,128 @@ class WebI3Bridge:
         ])
 ```
 
+## MUD Onboarding Checklist
+
+### Pre-Integration Requirements
+
+- [ ] **MUD Information Gathered**
+  - MUD name (must be unique on I3 network)
+  - MUD port number
+  - Admin email address
+  - MUD type (Circle, LP, Tiny, etc.)
+  - MUD status (open, development, testing)
+
+- [ ] **Technical Prerequisites**
+  - Network connectivity to gateway server
+  - JSON parsing capability in MUD codebase
+  - Socket support (WebSocket or TCP)
+  - Basic async/event handling (recommended)
+
+### Gateway Setup
+
+- [ ] **API Key Generation**
+  - Request API key from gateway administrator
+  - Store API key securely (environment variable or config file)
+  - Never commit API key to version control
+
+- [ ] **Connection Configuration**
+  - Gateway WebSocket URL: `ws://gateway-host:8080/ws`
+  - Gateway TCP endpoint: `gateway-host:8081`
+  - Backup gateway endpoints (if available)
+
+### Implementation Checklist
+
+- [ ] **Phase 1: Basic Connection**
+  - [ ] Implement socket connection to gateway
+  - [ ] Implement authentication flow
+  - [ ] Handle connection errors and reconnection
+  - [ ] Test basic ping/pong keepalive
+
+- [ ] **Phase 2: Core Services**
+  - [ ] Implement tell sending and receiving
+  - [ ] Add channel subscription and messaging
+  - [ ] Implement who/finger queries
+  - [ ] Add locate service support
+
+- [ ] **Phase 3: Event Handling**
+  - [ ] Handle tell_received events
+  - [ ] Process channel_message events
+  - [ ] Update mudlist on mud_online/offline events
+  - [ ] Implement error_occurred handling
+
+- [ ] **Phase 4: Advanced Features**
+  - [ ] Add channel administration commands
+  - [ ] Implement emoteto support
+  - [ ] Add user cache updates
+  - [ ] Support OOB services (if needed)
+
+### Testing Checklist
+
+- [ ] **Unit Testing**
+  - [ ] Test authentication flow
+  - [ ] Test message encoding/decoding
+  - [ ] Test error handling
+  - [ ] Test reconnection logic
+
+- [ ] **Integration Testing**
+  - [ ] Connect to test gateway
+  - [ ] Send and receive tells
+  - [ ] Join and use channels
+  - [ ] Query other MUDs (who, finger)
+
+- [ ] **Load Testing**
+  - [ ] Test with expected message volume
+  - [ ] Verify memory usage is stable
+  - [ ] Check for message queue backlogs
+  - [ ] Test connection stability over time
+
+### Production Readiness
+
+- [ ] **Security**
+  - [ ] API key stored securely
+  - [ ] Input validation on all I3 messages
+  - [ ] Rate limiting implemented
+  - [ ] Spam/abuse protection in place
+
+- [ ] **Monitoring**
+  - [ ] Connection status monitoring
+  - [ ] Message queue monitoring
+  - [ ] Error logging and alerting
+  - [ ] Performance metrics collection
+
+- [ ] **Documentation**
+  - [ ] Player commands documented
+  - [ ] Admin commands documented
+  - [ ] Configuration options documented
+  - [ ] Troubleshooting guide created
+
+- [ ] **Deployment**
+  - [ ] Production configuration tested
+  - [ ] Backup gateway configured
+  - [ ] Automatic reconnection tested
+  - [ ] Graceful shutdown implemented
+
+### Post-Integration
+
+- [ ] **Verification**
+  - [ ] Visible in I3 mudlist
+  - [ ] Can exchange tells with other MUDs
+  - [ ] Channel participation working
+  - [ ] All services responding correctly
+
+- [ ] **Optimization**
+  - [ ] Performance metrics reviewed
+  - [ ] Message batching optimized
+  - [ ] Cache settings tuned
+  - [ ] Connection pooling configured (if needed)
+
+### Support Contacts
+
+- **Gateway Administrator**: max@aiwithapex.com
+- **I3 Network Status**: Check with *i3 router
+- **Documentation**: See docs/ directory
+- **Issues**: Report through proper channels
+
 ## Troubleshooting
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed troubleshooting guidance.

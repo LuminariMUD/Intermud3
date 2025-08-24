@@ -1,0 +1,64 @@
+# Alertmanager Configuration
+global:
+  resolve_timeout: 5m
+  smtp_from: 'i3-gateway@aiwithapex.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'i3-gateway@aiwithapex.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'admin-email'
+  
+  routes:
+    - match:
+        severity: critical
+      receiver: 'admin-email-critical'
+      repeat_interval: 15m
+      
+    - match:
+        severity: warning
+      receiver: 'admin-email'
+      repeat_interval: 4h
+      
+receivers:
+  - name: 'admin-email'
+    email_configs:
+      - to: 'max@aiwithapex.com'
+        headers:
+          Subject: '[I3 Gateway] {{ .GroupLabels.alertname }} - {{ .GroupLabels.severity }}'
+        html: |
+          <h2>{{ .GroupLabels.alertname }}</h2>
+          <p><b>Severity:</b> {{ .GroupLabels.severity }}</p>
+          {{ range .Alerts }}
+          <hr>
+          <p><b>Summary:</b> {{ .Annotations.summary }}</p>
+          <p><b>Description:</b> {{ .Annotations.description }}</p>
+          <p><b>Started:</b> {{ .StartsAt }}</p>
+          {{ end }}
+          
+  - name: 'admin-email-critical'
+    email_configs:
+      - to: 'max@aiwithapex.com'
+        headers:
+          Subject: '[CRITICAL] I3 Gateway Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h1 style="color: red;">CRITICAL ALERT</h1>
+          <h2>{{ .GroupLabels.alertname }}</h2>
+          {{ range .Alerts }}
+          <hr>
+          <p><b>Summary:</b> {{ .Annotations.summary }}</p>
+          <p><b>Description:</b> {{ .Annotations.description }}</p>
+          <p><b>Started:</b> {{ .StartsAt }}</p>
+          <p><b>Labels:</b> {{ .Labels }}</p>
+          {{ end }}
+          
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']

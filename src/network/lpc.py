@@ -12,8 +12,6 @@ from typing import Any
 class LPCError(Exception):
     """Base exception for LPC encoding/decoding errors."""
 
-    pass
-
 
 class LPCEncoder:
     """Encodes Python objects to LPC binary format."""

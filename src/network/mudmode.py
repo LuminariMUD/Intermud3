@@ -17,8 +17,6 @@ from .lpc import LPCDecoder, LPCEncoder, LPCError
 class MudModeError(Exception):
     """Base exception for MudMode protocol errors."""
 
-    pass
-
 
 @dataclass
 class I3Packet:

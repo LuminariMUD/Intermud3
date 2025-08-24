@@ -439,10 +439,10 @@ class StateManager:
                 # Log error but continue
                 print(f"Error in cleanup task: {e}")
                 await asyncio.sleep(60)  # Wait before retrying
-    
+
     async def get_mudlist(self) -> list[dict[str, Any]]:
         """Get the full mudlist.
-        
+
         Returns:
             List of MUD information dictionaries
         """
@@ -461,81 +461,77 @@ class StateManager:
                 }
                 for mud in self.mudlist.values()
             ]
-    
+
     async def get_channel_history(
-        self, 
-        channel: str, 
-        limit: int = 50,
-        before: str | None = None,
-        after: str | None = None
+        self, channel: str, limit: int = 50, before: str | None = None, after: str | None = None
     ) -> list[dict[str, Any]]:
         """Get channel message history.
-        
+
         Args:
             channel: Channel name
             limit: Maximum number of messages to return
             before: Return messages before this timestamp
             after: Return messages after this timestamp
-            
+
         Returns:
             List of message dictionaries
         """
         # For now, return empty - would need to implement message history storage
         return []
-    
+
     async def get_who_data(self, mud_name: str) -> dict[str, Any] | None:
         """Get cached who data for a MUD.
-        
+
         Args:
             mud_name: Name of the MUD
-            
+
         Returns:
             Who data or None if not cached
         """
         cache_key = f"who_{mud_name}"
         return await self.cache.get(cache_key)
-    
+
     async def get_finger_data(self, mud_name: str, user_name: str) -> dict[str, Any] | None:
         """Get cached finger data for a user.
-        
+
         Args:
             mud_name: Name of the MUD
             user_name: Name of the user
-            
+
         Returns:
             Finger data or None if not cached
         """
         cache_key = f"finger_{mud_name}_{user_name}"
         return await self.cache.get(cache_key)
-    
+
     async def get_locate_data(self, user_name: str) -> dict[str, Any] | None:
         """Get cached locate data for a user.
-        
+
         Args:
             user_name: Name of the user
-            
+
         Returns:
             Locate data or None if not cached
         """
         cache_key = f"locate_{user_name}"
         return await self.cache.get(cache_key)
-    
+
     async def get_stats(self) -> dict[str, Any]:
         """Get gateway statistics.
-        
+
         Returns:
             Statistics dictionary
         """
         async with self.mudlist_lock:
             mud_count = len(self.mudlist)
             online_muds = sum(1 for mud in self.mudlist.values() if mud.status == 0)
-        
+
         async with self.channel_lock:
             channel_count = len(self.channels)
-        
+
         async with self.session_lock:
             session_count = len(self.sessions)
-        
+
         return {
             "mud_count": mud_count,
             "online_muds": online_muds,

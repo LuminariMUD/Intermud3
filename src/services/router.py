@@ -119,7 +119,7 @@ class RouterService(BaseService):
             self.logger.error("Error getting MUD info", target_mud=packet.target_mud, error=str(e))
             self.packets_dropped += 1
             return False
-            
+
         if not mud_info:
             self.logger.warning("Target MUD not found in mudlist", target_mud=packet.target_mud)
             # Send error packet back to originator
