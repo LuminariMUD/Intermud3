@@ -36,6 +36,7 @@ https://github.com/LuminariMUD/Intermud3
 <div align="center">
 
 ### **🚀 Production Ready with Full API Implementation!**
+### **🌟 NOW LIVE IN PRODUCTION** 
 
 </div>
 
@@ -47,6 +48,7 @@ https://github.com/LuminariMUD/Intermud3
 | **CircleMUD Integration** | 🔧 Available | Thread-safe C implementation |
 | **Performance** | ⚡ Exceeded | 1000+ msg/sec, <100ms latency achieved |
 | **Documentation** | 📚 Complete | Full API docs, integration guides, examples |
+| **Production Deployment** | 🚀 LIVE | Running on plesk.luminarimud.com with systemd |
 
 > 🎯 **Next:** Phase 4 will bring advanced features like web UI, GraphQL API, and clustering support!
 

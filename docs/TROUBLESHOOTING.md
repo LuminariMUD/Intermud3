@@ -5,6 +5,7 @@
 This guide helps you diagnose and resolve common issues when integrating with the Intermud3 Gateway. It covers connection problems, authentication issues, message delivery failures, performance problems, and provides debugging techniques.
 
 **Current Status**: Phase 3 Complete (2025-08-20) - Full JSON-RPC API implementation with WebSocket/TCP support, 78% test coverage, 1200+ tests.
+**Production Status**: LIVE on plesk.luminarimud.com with systemd service management.
 
 ## Table of Contents
 
@@ -104,7 +105,29 @@ telnet localhost 8080
    systemctl enable i3-gateway
    ```
 
-2. **Port Conflicts:**
+2. **Systemd Service Exit Code 203/EXEC:**
+   ```bash
+   # This means Python venv doesn't exist yet
+   sudo su - intermud3
+   cd ~/Intermud3
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   exit
+   
+   # Restart service
+   sudo systemctl restart i3-gateway
+   ```
+
+3. **Service Hangs During Restart:**
+   ```bash
+   # Force kill the stuck process
+   sudo systemctl kill -s KILL i3-gateway
+   sudo systemctl start i3-gateway
+   sudo systemctl status i3-gateway
+   ```
+
+4. **Port Conflicts:**
    ```bash
    # Find process using port
    lsof -i :8080  # WebSocket
@@ -117,7 +140,7 @@ telnet localhost 8080
    # Or change gateway port in config
    ```
 
-3. **Firewall Issues:**
+5. **Firewall Issues:**
    ```bash
    # Check firewall rules
    iptables -L
@@ -130,7 +153,7 @@ telnet localhost 8080
    iptables -A INPUT -p tcp --dport 8081 -j ACCEPT
    ```
 
-4. **Configuration Issues:**
+6. **Configuration Issues:**
    ```yaml
    # config/config.yaml
    api:

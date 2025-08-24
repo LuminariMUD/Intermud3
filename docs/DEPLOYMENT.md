@@ -34,6 +34,33 @@
 
 ## Installation Methods
 
+### Quick Deploy (Recommended for Production)
+
+```bash
+# As root, create a dedicated user
+useradd -m -s /bin/bash intermud3
+usermod -aG docker intermud3  # If using Docker
+mkdir -p /home/intermud3/{logs,data}
+chown -R intermud3:intermud3 /home/intermud3/
+
+# Switch to the intermud3 user
+sudo su - intermud3
+
+# Clone and setup
+git clone https://github.com/LuminariMUD/Intermud3.git
+cd Intermud3
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure
+cp .env.example .env
+nano .env  # Set your MUD_NAME and other settings
+
+# Test run
+python -m src  # Ctrl+C to stop when confirmed working
+```
+
 ### Method 1: From Source
 
 ```bash
@@ -367,9 +394,26 @@ MESSAGE_QUEUE_SIZE=5000
 CACHE_TTL=600
 ```
 
-### Systemd Service
+### Systemd Service (Recommended for Production)
 
-Create `/etc/systemd/system/i3-gateway.service`:
+A systemd service file is included in the repository. As root:
+
+```bash
+# Copy the service file
+cp /home/intermud3/Intermud3/i3-gateway.service /etc/systemd/system/
+
+# Create log directory
+mkdir -p /home/intermud3/logs
+chown intermud3:intermud3 /home/intermud3/logs
+
+# Enable and start the service
+systemctl daemon-reload
+systemctl enable i3-gateway
+systemctl start i3-gateway
+systemctl status i3-gateway
+```
+
+The included service file (`i3-gateway.service`):
 
 ```ini
 [Unit]
@@ -379,22 +423,15 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=i3gateway
-Group=i3gateway
-WorkingDirectory=/opt/i3-gateway
-Environment="PATH=/opt/i3-gateway/venv/bin"
-ExecStart=/opt/i3-gateway/venv/bin/python -m src
+User=intermud3
+Group=intermud3
+WorkingDirectory=/home/intermud3/Intermud3
+Environment="PATH=/home/intermud3/Intermud3/venv/bin"
+ExecStart=/home/intermud3/Intermud3/venv/bin/python -m src
 Restart=always
 RestartSec=10
-StandardOutput=append:/var/log/i3-gateway/stdout.log
-StandardError=append:/var/log/i3-gateway/stderr.log
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/i3-gateway/data /var/log/i3-gateway
+StandardOutput=append:/home/intermud3/logs/stdout.log
+StandardError=append:/home/intermud3/logs/stderr.log
 
 [Install]
 WantedBy=multi-user.target
