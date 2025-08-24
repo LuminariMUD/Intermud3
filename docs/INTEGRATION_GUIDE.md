@@ -49,7 +49,65 @@ This guide provides step-by-step instructions for integrating your MUD server wi
 The gateway provides official client libraries to simplify integration:
 - **Python Client** (`clients/python/i3_client.py`): Full async/sync support
 - **JavaScript/Node.js Client** (`clients/javascript/i3-client.js`): With TypeScript definitions (`i3-client.d.ts`)
+- **CircleMUD/tbaMUD Client** (`clients/circlemud/`): Native C integration
 - **Example Implementations**: simple_mud, channel_bot, relay_bridge, web_client
+
+## Network Requirements and Configuration
+
+### Firewall Rules
+
+Your MUD server needs to establish outbound connections to the I3 Gateway:
+
+```bash
+# Allow outbound WebSocket connections
+iptables -A OUTPUT -p tcp --dport 8080 -j ACCEPT  # WebSocket API
+iptables -A OUTPUT -p tcp --dport 8081 -j ACCEPT  # TCP API
+
+# If using Docker, ensure bridge network allows connection
+docker network inspect bridge  # Check gateway connectivity
+```
+
+### Port Configuration
+
+The gateway uses these default ports (configurable):
+- **8080**: WebSocket API (ws:// or wss://)
+- **8081**: TCP Socket API (line-delimited JSON)
+- **9090**: Metrics endpoint (Prometheus format)
+
+### NAT and Proxy Traversal
+
+If your MUD is behind NAT or proxy:
+
+```bash
+# For HTTP proxy (WebSocket connections)
+export HTTP_PROXY=http://proxy.example.com:3128
+export HTTPS_PROXY=http://proxy.example.com:3128
+
+# For SOCKS proxy
+export ALL_PROXY=socks5://proxy.example.com:1080
+```
+
+### DNS Requirements
+
+Ensure your MUD can resolve the gateway hostname:
+```bash
+# Test DNS resolution
+nslookup your-gateway-host.com
+dig your-gateway-host.com
+
+# Add to /etc/hosts if needed
+echo "192.168.1.100 i3-gateway.local" >> /etc/hosts
+```
+
+### Connection Keepalive
+
+Configure TCP keepalive for persistent connections:
+```bash
+# Linux kernel parameters
+echo 600 > /proc/sys/net/ipv4/tcp_keepalive_time
+echo 60 > /proc/sys/net/ipv4/tcp_keepalive_intvl
+echo 20 > /proc/sys/net/ipv4/tcp_keepalive_probes
+```
 
 ## Quick Start
 
@@ -92,6 +150,147 @@ Expected response:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":2,"method":"tell","params":{"target_mud":"TestMUD","target_user":"TestUser","message":"Hello I3!","from_user":"YourUser"}}' | websocat ws://localhost:8080/ws
+```
+
+### Alternative Testing Methods (No websocat)
+
+Using curl for testing:
+```bash
+# Test health endpoint
+curl http://localhost:8080/health
+
+# Test with curl and wscat (npm install -g wscat)
+wscat -c ws://localhost:8080/ws
+> {"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"api_key":"your-api-key"}}
+```
+
+Using telnet for TCP API:
+```bash
+telnet localhost 8081
+{"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"api_key":"your-api-key"}}
+```
+
+## API Key Management
+
+### Requesting an API Key
+
+Contact the gateway administrator with:
+1. **MUD Name**: Unique identifier for your MUD
+2. **Contact Email**: For administrative communications
+3. **MUD Type**: CircleMUD, LPMud, DikuMUD, etc.
+4. **Expected Traffic**: Messages per minute estimate
+5. **Required Permissions**: tell, channel, who, finger, etc.
+
+### Secure Storage Best Practices
+
+**NEVER commit API keys to version control!**
+
+#### Environment Variables (Recommended)
+```bash
+# .env file (add to .gitignore)
+I3_API_KEY=your-secret-api-key-here
+I3_GATEWAY_URL=ws://gateway.example.com:8080/ws
+
+# Load in your application
+export $(cat .env | xargs)
+```
+
+#### Configuration File (Alternative)
+```yaml
+# config/i3-secrets.yaml (add to .gitignore)
+api:
+  key: ${I3_API_KEY}  # Reference environment variable
+  # OR use encrypted value
+  key_encrypted: "AES256:base64encodedencryptedkey"
+```
+
+#### Key Vault Integration
+```python
+# Using system keyring (Python example)
+import keyring
+
+# Store API key securely
+keyring.set_password("i3-gateway", "api-key", "your-secret-key")
+
+# Retrieve API key
+api_key = keyring.get_password("i3-gateway", "api-key")
+```
+
+### API Key Rotation
+
+Implement key rotation for production systems:
+
+```python
+class APIKeyManager:
+    def __init__(self):
+        self.primary_key = os.getenv('I3_API_KEY_PRIMARY')
+        self.secondary_key = os.getenv('I3_API_KEY_SECONDARY')
+        self.current_key = self.primary_key
+    
+    async def rotate_key(self):
+        """Rotate to secondary key without downtime."""
+        old_key = self.current_key
+        self.current_key = self.secondary_key
+        
+        # Test new key
+        if await self.test_authentication(self.current_key):
+            # Success - update primary
+            self.primary_key = self.secondary_key
+            # Generate new secondary for next rotation
+            self.secondary_key = await self.request_new_key()
+        else:
+            # Rollback
+            self.current_key = old_key
+            raise Exception("Key rotation failed")
+```
+
+### Permission Scopes
+
+API keys can have limited permissions:
+
+```yaml
+# Gateway configuration for your API key
+api_keys:
+  - key: "your-api-key-hash"
+    mud_name: "YourMUD"
+    permissions:
+      - tell          # Send/receive tells
+      - channel       # Join/send to channels
+      - who           # Query who lists
+      - finger        # Query finger info
+      - locate        # Locate users
+      - admin         # Administrative commands (if authorized)
+    rate_limits:
+      per_minute: 1000
+      burst: 100
+```
+
+### Monitoring API Key Usage
+
+Track your API key usage:
+
+```python
+class APIKeyMonitor:
+    def __init__(self):
+        self.request_count = 0
+        self.error_count = 0
+        self.last_reset = time.time()
+    
+    def log_request(self, method, success):
+        self.request_count += 1
+        if not success:
+            self.error_count += 1
+        
+        # Alert if error rate too high
+        if self.error_count > 10:
+            self.alert_admin("High error rate detected")
+    
+    def get_metrics(self):
+        return {
+            "requests": self.request_count,
+            "errors": self.error_count,
+            "uptime": time.time() - self.last_reset
+        }
 ```
 
 ## Detailed Integration Steps
@@ -765,6 +964,320 @@ int cmd_i3chat(object me, string str) {
 }
 ```
 
+#### For DikuMUD/ROM (C)
+
+```c
+// i3_integration.h
+#ifndef I3_INTEGRATION_H
+#define I3_INTEGRATION_H
+
+#include "merc.h"  // or your MUD's main header
+#include <pthread.h>
+
+typedef struct i3_connection {
+    int socket;
+    bool connected;
+    char session_id[128];
+    pthread_t thread;
+    pthread_mutex_t mutex;
+} I3_CONNECTION;
+
+// Global I3 connection
+extern I3_CONNECTION *i3_conn;
+
+// Function prototypes
+void i3_startup(void);
+void i3_shutdown(void);
+void i3_process_events(void);
+void do_i3tell(CHAR_DATA *ch, char *argument);
+void do_i3chat(CHAR_DATA *ch, char *argument);
+void do_i3who(CHAR_DATA *ch, char *argument);
+
+#endif
+
+// i3_integration.c
+#include "i3_integration.h"
+#include <json-c/json.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+I3_CONNECTION *i3_conn = NULL;
+
+void i3_startup(void) {
+    struct sockaddr_in server_addr;
+    json_object *auth_msg, *params;
+    char buffer[4096];
+    
+    // Allocate connection structure
+    i3_conn = (I3_CONNECTION *)calloc(1, sizeof(I3_CONNECTION));
+    pthread_mutex_init(&i3_conn->mutex, NULL);
+    
+    // Create socket
+    i3_conn->socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (i3_conn->socket < 0) {
+        log_string("I3: Failed to create socket");
+        return;
+    }
+    
+    // Connect to gateway
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(8081);  // TCP API port
+    inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
+    
+    if (connect(i3_conn->socket, (struct sockaddr*)&server_addr, 
+                sizeof(server_addr)) < 0) {
+        log_string("I3: Failed to connect to gateway");
+        close(i3_conn->socket);
+        return;
+    }
+    
+    // Authenticate
+    auth_msg = json_object_new_object();
+    json_object_object_add(auth_msg, "jsonrpc", 
+                          json_object_new_string("2.0"));
+    json_object_object_add(auth_msg, "id", 
+                          json_object_new_int(1));
+    json_object_object_add(auth_msg, "method", 
+                          json_object_new_string("authenticate"));
+    
+    params = json_object_new_object();
+    json_object_object_add(params, "api_key", 
+                          json_object_new_string("your-api-key"));
+    json_object_object_add(auth_msg, "params", params);
+    
+    // Send authentication
+    sprintf(buffer, "%s\n", json_object_to_json_string(auth_msg));
+    send(i3_conn->socket, buffer, strlen(buffer), 0);
+    
+    json_object_put(auth_msg);
+    
+    i3_conn->connected = TRUE;
+    log_string("I3: Connected to gateway");
+    
+    // Start receiver thread
+    pthread_create(&i3_conn->thread, NULL, i3_receiver_thread, NULL);
+}
+
+void do_i3tell(CHAR_DATA *ch, char *argument) {
+    char mud[128], user[128], message[2048];
+    json_object *msg, *params;
+    char buffer[4096];
+    
+    if (!i3_conn || !i3_conn->connected) {
+        send_to_char("I3 network is not connected.\n\r", ch);
+        return;
+    }
+    
+    // Parse arguments
+    argument = one_argument(argument, mud);
+    argument = one_argument(argument, user);
+    
+    if (!*mud || !*user || !*argument) {
+        send_to_char("Usage: i3tell <mud> <user> <message>\n\r", ch);
+        return;
+    }
+    
+    // Build JSON message
+    msg = json_object_new_object();
+    json_object_object_add(msg, "jsonrpc", 
+                          json_object_new_string("2.0"));
+    json_object_object_add(msg, "id", 
+                          json_object_new_int(random()));
+    json_object_object_add(msg, "method", 
+                          json_object_new_string("tell"));
+    
+    params = json_object_new_object();
+    json_object_object_add(params, "target_mud", 
+                          json_object_new_string(mud));
+    json_object_object_add(params, "target_user", 
+                          json_object_new_string(user));
+    json_object_object_add(params, "message", 
+                          json_object_new_string(argument));
+    json_object_object_add(params, "from_user", 
+                          json_object_new_string(ch->name));
+    json_object_object_add(msg, "params", params);
+    
+    // Send message
+    pthread_mutex_lock(&i3_conn->mutex);
+    sprintf(buffer, "%s\n", json_object_to_json_string(msg));
+    send(i3_conn->socket, buffer, strlen(buffer), 0);
+    pthread_mutex_unlock(&i3_conn->mutex);
+    
+    json_object_put(msg);
+    
+    send_to_char("I3 tell sent.\n\r", ch);
+}
+
+// Add to your command table in interp.c:
+// { "i3tell",  do_i3tell,  POS_DEAD,  0,  LOG_NORMAL, 1 },
+// { "i3chat",  do_i3chat,  POS_DEAD,  0,  LOG_NORMAL, 1 },
+// { "i3who",   do_i3who,   POS_DEAD,  0,  LOG_NORMAL, 1 },
+```
+
+#### For TinyMUD/MUSH/MOO (Softcode + Hardcode)
+
+```c
+// i3_tiny.c - TinyMUD I3 integration
+#include "config.h"
+#include "db.h"
+#include "interface.h"
+#include "externs.h"
+#include <sys/socket.h>
+#include <json-c/json.h>
+
+static int i3_socket = -1;
+static int i3_connected = 0;
+
+// Initialize I3 connection
+void i3_init(void) {
+    struct sockaddr_in addr;
+    json_object *auth;
+    char buffer[BUFFER_LEN];
+    
+    // Create TCP socket
+    i3_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (i3_socket < 0) {
+        fprintf(stderr, "I3: Cannot create socket\n");
+        return;
+    }
+    
+    // Connect to gateway
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(8081);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    
+    if (connect(i3_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        fprintf(stderr, "I3: Cannot connect to gateway\n");
+        close(i3_socket);
+        i3_socket = -1;
+        return;
+    }
+    
+    // Send authentication
+    auth = json_object_new_object();
+    json_object_object_add(auth, "jsonrpc", json_object_new_string("2.0"));
+    json_object_object_add(auth, "id", json_object_new_int(1));
+    json_object_object_add(auth, "method", json_object_new_string("authenticate"));
+    
+    json_object *params = json_object_new_object();
+    json_object_object_add(params, "api_key", 
+                          json_object_new_string(I3_API_KEY));
+    json_object_object_add(auth, "params", params);
+    
+    sprintf(buffer, "%s\n", json_object_to_json_string(auth));
+    send(i3_socket, buffer, strlen(buffer), 0);
+    
+    json_object_put(auth);
+    
+    i3_connected = 1;
+    fprintf(stderr, "I3: Connected to gateway\n");
+}
+
+// Built-in function for softcode
+void fun_i3tell(char *buff, char **bufc, dbref player, dbref cause,
+                char *fargs[], int nfargs, char *cargs[], int ncargs) {
+    json_object *msg, *params;
+    char buffer[BUFFER_LEN];
+    
+    if (nfargs < 3) {
+        safe_str("#-1 FUNCTION (I3TELL) EXPECTS 3 ARGUMENTS", buff, bufc);
+        return;
+    }
+    
+    if (!i3_connected) {
+        safe_str("#-1 I3 NOT CONNECTED", buff, bufc);
+        return;
+    }
+    
+    // Build tell message
+    msg = json_object_new_object();
+    json_object_object_add(msg, "jsonrpc", json_object_new_string("2.0"));
+    json_object_object_add(msg, "id", json_object_new_int(random()));
+    json_object_object_add(msg, "method", json_object_new_string("tell"));
+    
+    params = json_object_new_object();
+    json_object_object_add(params, "target_mud", json_object_new_string(fargs[0]));
+    json_object_object_add(params, "target_user", json_object_new_string(fargs[1]));
+    json_object_object_add(params, "message", json_object_new_string(fargs[2]));
+    json_object_object_add(params, "from_user", 
+                          json_object_new_string(Name(player)));
+    json_object_object_add(msg, "params", params);
+    
+    // Send message
+    sprintf(buffer, "%s\n", json_object_to_json_string(msg));
+    send(i3_socket, buffer, strlen(buffer), 0);
+    
+    json_object_put(msg);
+    
+    safe_str("I3 tell sent", buff, bufc);
+}
+
+// Process incoming I3 events
+void i3_process(void) {
+    char buffer[BUFFER_LEN];
+    json_object *msg, *method, *params;
+    int bytes;
+    
+    if (!i3_connected) return;
+    
+    // Non-blocking read
+    bytes = recv(i3_socket, buffer, BUFFER_LEN-1, MSG_DONTWAIT);
+    if (bytes <= 0) return;
+    
+    buffer[bytes] = '\0';
+    
+    // Parse JSON
+    msg = json_tokener_parse(buffer);
+    if (!msg) return;
+    
+    // Check for method (event)
+    if (json_object_object_get_ex(msg, "method", &method)) {
+        const char *method_str = json_object_get_string(method);
+        json_object_object_get_ex(msg, "params", &params);
+        
+        if (strcmp(method_str, "tell_received") == 0) {
+            // Handle incoming tell
+            json_object *from_user, *from_mud, *to_user, *message;
+            json_object_object_get_ex(params, "from_user", &from_user);
+            json_object_object_get_ex(params, "from_mud", &from_mud);
+            json_object_object_get_ex(params, "to_user", &to_user);
+            json_object_object_get_ex(params, "message", &message);
+            
+            // Find target player
+            dbref target = lookup_player(json_object_get_string(to_user));
+            if (target != NOTHING) {
+                notify_format(target, "[I3] %s@%s tells you: %s",
+                            json_object_get_string(from_user),
+                            json_object_get_string(from_mud),
+                            json_object_get_string(message));
+            }
+        }
+    }
+    
+    json_object_put(msg);
+}
+```
+
+##### MUSH Softcode Commands
+
+```mush
+# I3 Tell Command
+&CMD_I3TELL #100=$i3tell *=*:*:@pemit %#=[i3tell(%0,%1,%2)]
+
+# I3 Channel Command  
+&CMD_I3CHAT #100=$i3chat *:@pemit %#=[i3channel(intermud,%0,name(%#))]
+
+# I3 Who Command
+&CMD_I3WHO #100=$i3who *:@pemit %#=[i3who(%0)]
+
+# I3 Channel Listener (triggered by hardcode)
+&I3_CHANNEL_HANDLER #100=@pemit/contents %l=[ansi(hy,\[I3-%0\])] [ansi(hc,%1@%2)]: %3
+
+# Auto-join channels on connect
+&ACONNECT #100=@wait 2=@pemit %#=[i3channel_join(intermud,name(%#))]
+```
+
 ### Step 4: Handle Events
 
 Event handling is crucial for a responsive I3 integration. Here's how to handle the most common events:
@@ -825,6 +1338,430 @@ async def handle_error_occurred(params):
     # Notify administrators if critical
     if error_type in ['connection_lost', 'authentication_failed']:
         notify_admins(f"Critical I3 error: {message}")
+
+async def handle_emoteto_received(params):
+    """Handle incoming emotes."""
+    from_user = params['from_user']
+    from_mud = params['from_mud']
+    to_user = params['to_user']
+    message = params['message']
+    
+    player = find_player(to_user)
+    if player:
+        send_to_player(player, f"[I3 Emote] {from_user}@{from_mud} {message}")
+
+async def handle_user_cache_update(params):
+    """Handle user cache updates from other MUDs."""
+    mud_name = params['mud_name']
+    users = params['users']
+    
+    # Update local cache
+    update_user_cache(mud_name, users)
+    
+async def handle_channel_joined(params):
+    """Handle successful channel join."""
+    channel = params['channel']
+    user_name = params.get('user_name', 'System')
+    
+    log_info(f"Successfully joined channel: {channel}")
+    notify_channel_subscribers(channel, f"{user_name} has joined {channel}")
+
+async def handle_channel_left(params):
+    """Handle channel leave notification."""
+    channel = params['channel']
+    user_name = params.get('user_name', 'System')
+    
+    log_info(f"Left channel: {channel}")
+    notify_channel_subscribers(channel, f"{user_name} has left {channel}")
+```
+
+## Comprehensive Error Handling
+
+### Connection Error Recovery
+
+Implement robust error recovery for all connection scenarios:
+
+```python
+import asyncio
+import enum
+from typing import Optional, Callable
+from datetime import datetime, timedelta
+
+class ConnectionState(enum.Enum):
+    DISCONNECTED = "disconnected"
+    CONNECTING = "connecting"
+    AUTHENTICATING = "authenticating"
+    CONNECTED = "connected"
+    RECONNECTING = "reconnecting"
+    ERROR = "error"
+
+class ErrorHandler:
+    """Comprehensive error handling for I3 integration."""
+    
+    def __init__(self, client):
+        self.client = client
+        self.error_counts = {}
+        self.last_errors = {}
+        self.circuit_breaker_state = {}
+        self.retry_policies = {
+            'connection': ExponentialBackoff(base=1, max=60),
+            'authentication': LinearBackoff(interval=5, max_attempts=3),
+            'message': ExponentialBackoff(base=0.5, max=30)
+        }
+    
+    async def handle_error(self, error_type: str, error: Exception, context: dict = None):
+        """Central error handler with intelligent recovery."""
+        
+        # Track error frequency
+        self.track_error(error_type, error)
+        
+        # Check circuit breaker
+        if self.is_circuit_open(error_type):
+            logging.warning(f"Circuit breaker open for {error_type}")
+            return False
+        
+        # Determine recovery strategy
+        strategy = self.get_recovery_strategy(error_type, error)
+        
+        # Execute recovery
+        return await self.execute_recovery(strategy, error_type, error, context)
+    
+    def track_error(self, error_type: str, error: Exception):
+        """Track error frequency for circuit breaker."""
+        if error_type not in self.error_counts:
+            self.error_counts[error_type] = []
+        
+        self.error_counts[error_type].append(datetime.now())
+        self.last_errors[error_type] = str(error)
+        
+        # Clean old errors (keep last 5 minutes)
+        cutoff = datetime.now() - timedelta(minutes=5)
+        self.error_counts[error_type] = [
+            t for t in self.error_counts[error_type] if t > cutoff
+        ]
+    
+    def is_circuit_open(self, error_type: str) -> bool:
+        """Check if circuit breaker is tripped."""
+        if error_type not in self.circuit_breaker_state:
+            return False
+        
+        state = self.circuit_breaker_state[error_type]
+        if state['open_until'] > datetime.now():
+            return True
+        
+        # Circuit breaker expired, reset
+        del self.circuit_breaker_state[error_type]
+        return False
+    
+    def trip_circuit_breaker(self, error_type: str, duration: int = 60):
+        """Trip the circuit breaker for specified duration."""
+        self.circuit_breaker_state[error_type] = {
+            'open_until': datetime.now() + timedelta(seconds=duration),
+            'reason': self.last_errors.get(error_type, 'Unknown')
+        }
+    
+    def get_recovery_strategy(self, error_type: str, error: Exception) -> str:
+        """Determine best recovery strategy based on error."""
+        
+        error_strategies = {
+            # Network errors
+            'ConnectionRefusedError': 'reconnect_with_backoff',
+            'ConnectionResetError': 'immediate_reconnect',
+            'TimeoutError': 'retry_with_timeout',
+            'OSError': 'check_network_and_retry',
+            
+            # Protocol errors
+            'AuthenticationError': 'reauthenticate',
+            'PermissionError': 'check_permissions',
+            'RateLimitError': 'backoff_and_retry',
+            
+            # Message errors
+            'JSONDecodeError': 'log_and_continue',
+            'ValidationError': 'fix_and_retry',
+            'UnknownMethodError': 'update_client'
+        }
+        
+        error_name = error.__class__.__name__
+        return error_strategies.get(error_name, 'default_recovery')
+    
+    async def execute_recovery(self, strategy: str, error_type: str, 
+                              error: Exception, context: dict) -> bool:
+        """Execute the selected recovery strategy."""
+        
+        strategies = {
+            'reconnect_with_backoff': self.reconnect_with_backoff,
+            'immediate_reconnect': self.immediate_reconnect,
+            'retry_with_timeout': self.retry_with_timeout,
+            'check_network_and_retry': self.check_network_and_retry,
+            'reauthenticate': self.reauthenticate,
+            'check_permissions': self.check_permissions,
+            'backoff_and_retry': self.backoff_and_retry,
+            'log_and_continue': self.log_and_continue,
+            'fix_and_retry': self.fix_and_retry,
+            'update_client': self.update_client,
+            'default_recovery': self.default_recovery
+        }
+        
+        handler = strategies.get(strategy, self.default_recovery)
+        return await handler(error_type, error, context)
+    
+    async def reconnect_with_backoff(self, error_type, error, context):
+        """Reconnect with exponential backoff."""
+        retry_policy = self.retry_policies['connection']
+        delay = retry_policy.get_next_delay()
+        
+        logging.info(f"Reconnecting in {delay} seconds...")
+        await asyncio.sleep(delay)
+        
+        try:
+            await self.client.connect()
+            retry_policy.reset()
+            return True
+        except Exception as e:
+            logging.error(f"Reconnection failed: {e}")
+            
+            # Check if we should trip circuit breaker
+            if retry_policy.is_exhausted():
+                self.trip_circuit_breaker(error_type, 300)  # 5 minutes
+                return False
+            
+            # Recursive retry
+            return await self.reconnect_with_backoff(error_type, e, context)
+    
+    async def immediate_reconnect(self, error_type, error, context):
+        """Attempt immediate reconnection."""
+        try:
+            await self.client.disconnect()
+            await self.client.connect()
+            return True
+        except Exception as e:
+            logging.error(f"Immediate reconnect failed: {e}")
+            return await self.reconnect_with_backoff(error_type, e, context)
+    
+    async def retry_with_timeout(self, error_type, error, context):
+        """Retry operation with increased timeout."""
+        if context and 'operation' in context:
+            original_timeout = context.get('timeout', 30)
+            new_timeout = min(original_timeout * 2, 120)
+            
+            try:
+                return await asyncio.wait_for(
+                    context['operation'](),
+                    timeout=new_timeout
+                )
+            except asyncio.TimeoutError:
+                logging.error(f"Operation timed out after {new_timeout}s")
+                return False
+        return False
+    
+    async def check_network_and_retry(self, error_type, error, context):
+        """Check network connectivity before retrying."""
+        import socket
+        
+        try:
+            # Test DNS resolution
+            socket.gethostbyname(self.client.gateway_host)
+            
+            # Test TCP connection
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            result = sock.connect_ex((self.client.gateway_host, self.client.gateway_port))
+            sock.close()
+            
+            if result == 0:
+                # Network is OK, retry connection
+                return await self.reconnect_with_backoff(error_type, error, context)
+            else:
+                logging.error(f"Cannot reach gateway on port {self.client.gateway_port}")
+                await asyncio.sleep(30)
+                return await self.check_network_and_retry(error_type, error, context)
+                
+        except socket.gaierror:
+            logging.error(f"Cannot resolve hostname: {self.client.gateway_host}")
+            return False
+    
+    async def reauthenticate(self, error_type, error, context):
+        """Attempt to reauthenticate with gateway."""
+        try:
+            # Clear session
+            self.client.session_id = None
+            self.client.authenticated = False
+            
+            # Reconnect and authenticate
+            await self.client.disconnect()
+            await self.client.connect()
+            return True
+            
+        except Exception as e:
+            logging.error(f"Reauthentication failed: {e}")
+            return False
+    
+    async def backoff_and_retry(self, error_type, error, context):
+        """Handle rate limiting with exponential backoff."""
+        if 'retry_after' in str(error):
+            # Parse retry-after header if available
+            import re
+            match = re.search(r'retry_after[:\s]+(\d+)', str(error))
+            if match:
+                wait_time = int(match.group(1))
+            else:
+                wait_time = 60
+        else:
+            wait_time = 60
+        
+        logging.info(f"Rate limited. Waiting {wait_time} seconds...")
+        await asyncio.sleep(wait_time)
+        
+        # Retry the operation if context provided
+        if context and 'operation' in context:
+            return await context['operation']()
+        
+        return True
+    
+    async def log_and_continue(self, error_type, error, context):
+        """Log error and continue operation."""
+        logging.warning(f"Non-fatal error ({error_type}): {error}")
+        
+        if context:
+            # Log context for debugging
+            logging.debug(f"Error context: {context}")
+        
+        # Continue operation
+        return True
+    
+    async def default_recovery(self, error_type, error, context):
+        """Default recovery strategy."""
+        logging.error(f"Unhandled error ({error_type}): {error}")
+        
+        # If too many errors, trip circuit breaker
+        if error_type in self.error_counts:
+            if len(self.error_counts[error_type]) > 10:
+                self.trip_circuit_breaker(error_type, 120)
+        
+        return False
+
+class ExponentialBackoff:
+    """Exponential backoff retry policy."""
+    
+    def __init__(self, base=1, multiplier=2, max=60, max_attempts=None):
+        self.base = base
+        self.multiplier = multiplier
+        self.max = max
+        self.max_attempts = max_attempts
+        self.attempt = 0
+        self.current_delay = base
+    
+    def get_next_delay(self) -> float:
+        """Get next retry delay."""
+        self.attempt += 1
+        delay = min(self.current_delay, self.max)
+        self.current_delay *= self.multiplier
+        return delay
+    
+    def reset(self):
+        """Reset backoff state."""
+        self.attempt = 0
+        self.current_delay = self.base
+    
+    def is_exhausted(self) -> bool:
+        """Check if max attempts reached."""
+        if self.max_attempts is None:
+            return False
+        return self.attempt >= self.max_attempts
+
+class LinearBackoff:
+    """Linear backoff retry policy."""
+    
+    def __init__(self, interval=5, max_attempts=3):
+        self.interval = interval
+        self.max_attempts = max_attempts
+        self.attempt = 0
+    
+    def get_next_delay(self) -> float:
+        """Get next retry delay."""
+        self.attempt += 1
+        return self.interval
+    
+    def reset(self):
+        """Reset backoff state."""
+        self.attempt = 0
+    
+    def is_exhausted(self) -> bool:
+        """Check if max attempts reached."""
+        return self.attempt >= self.max_attempts
+```
+
+### Message Validation and Sanitization
+
+```python
+class MessageValidator:
+    """Validate and sanitize I3 messages."""
+    
+    def __init__(self):
+        self.max_message_length = 4096
+        self.max_username_length = 32
+        self.max_mudname_length = 64
+        self.forbidden_patterns = [
+            r'<script[^>]*>.*?</script>',  # XSS attempts
+            r'javascript:',                 # JavaScript URLs
+            r'on\w+\s*=',                   # Event handlers
+        ]
+    
+    def validate_tell(self, target_mud: str, target_user: str, 
+                     message: str, from_user: str) -> tuple[bool, str]:
+        """Validate tell parameters."""
+        
+        # Length checks
+        if len(target_mud) > self.max_mudname_length:
+            return False, f"MUD name too long (max {self.max_mudname_length})"
+        
+        if len(target_user) > self.max_username_length:
+            return False, f"Username too long (max {self.max_username_length})"
+        
+        if len(message) > self.max_message_length:
+            return False, f"Message too long (max {self.max_message_length})"
+        
+        # Character validation
+        if not self.is_valid_mudname(target_mud):
+            return False, "Invalid MUD name characters"
+        
+        if not self.is_valid_username(target_user):
+            return False, "Invalid username characters"
+        
+        # Content validation
+        sanitized_message = self.sanitize_message(message)
+        if sanitized_message != message:
+            return False, "Message contains forbidden content"
+        
+        return True, "Valid"
+    
+    def is_valid_mudname(self, name: str) -> bool:
+        """Check if MUD name contains only valid characters."""
+        import re
+        return bool(re.match(r'^[a-zA-Z0-9_-]+$', name))
+    
+    def is_valid_username(self, name: str) -> bool:
+        """Check if username contains only valid characters."""
+        import re
+        return bool(re.match(r'^[a-zA-Z0-9_\-\.\s]+$', name))
+    
+    def sanitize_message(self, message: str) -> str:
+        """Remove potentially harmful content from message."""
+        import re
+        
+        # Remove forbidden patterns
+        for pattern in self.forbidden_patterns:
+            message = re.sub(pattern, '', message, flags=re.IGNORECASE)
+        
+        # Escape special characters
+        message = message.replace('&', '&amp;')
+        message = message.replace('<', '&lt;')
+        message = message.replace('>', '&gt;')
+        
+        # Remove non-printable characters
+        message = ''.join(char for char in message if char.isprintable() or char in '\n\r\t')
+        
+        return message.strip()
 ```
 
 ## Testing Your Integration
