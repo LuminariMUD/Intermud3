@@ -1,0 +1,109 @@
+# Cursor AI Coding Agent Rules
+
+## Primary Guidelines Reference
+**READ FIRST**: All general AI coding guidelines, project overview, architecture, and development commands are in `@CLAUDE.md`. Follow those guidelines completely.
+
+## Cursor-Specific Rules
+
+### Code Intelligence & Autocomplete
+- Always use the project's established patterns when suggesting code completions
+- Prefer existing imports and dependencies over suggesting new ones
+- Follow the existing code style (Black formatting, 100-character line length)
+- Use type hints consistently with the project's MyPy configuration
+
+### File Navigation & Context
+- When working with I3 services, check `src/services/` for existing patterns
+- For API endpoints, reference `src/api/` structure
+- For protocol handling, see `src/network/mudmode.py` for LPC serialization patterns
+- Always check `tests/` for existing test patterns when writing new tests
+
+### Project-Specific Patterns
+
+#### Import Organization
+```python
+# Standard library imports first
+import asyncio
+from typing import Dict, List, Optional
+
+# Third-party imports
+import structlog
+from pydantic import BaseModel
+
+# Local imports
+from src.models.packet import I3Packet
+from src.services.base import BaseService
+```
+
+#### Async Patterns
+- All I/O operations should be async/await
+- Use `asyncio.create_task()` for concurrent operations
+- Follow the gateway's queue-based message handling pattern
+
+#### Error Handling
+- Use structured logging with `structlog`
+- Wrap network operations in try/catch with exponential backoff
+- Follow the project's circuit breaker pattern for resilience
+
+#### Configuration
+- Use Pydantic models for configuration validation
+- Support environment variable overrides with `${VAR:default}` syntax
+- Follow the existing config structure in `config/config.yaml`
+
+### Testing Guidelines
+- Write tests for new I3 services in `tests/services/`
+- Use pytest fixtures for common test data
+- Mock external I3 router connections using the existing mock patterns
+- Maintain the project's test coverage standards (~80%+)
+
+### API Development
+- Follow JSON-RPC 2.0 specification exactly
+- Use the existing event streaming patterns for WebSocket API
+- Implement proper rate limiting and authentication
+- Add metrics collection for new endpoints
+
+### Documentation
+- Update `docs/API_REFERENCE.md` for new API methods
+- Add integration examples to `clients/examples/` when relevant
+- Keep inline documentation focused and concise
+- Use the project's established markdown formatting
+
+### Performance Considerations
+- Target <100ms latency for API responses
+- Support 1000+ messages/second throughput
+- Use connection pooling for I3 router connections
+- Implement proper backpressure handling in message queues
+
+### Security
+- Never commit API keys or secrets to code
+- Use the project's authentication middleware for new endpoints
+- Validate all input data with Pydantic models
+- Follow the principle of least privilege for API permissions
+
+### Dependencies
+- Only suggest dependencies that are already in `requirements.txt` or `requirements-dev.txt`
+- For new dependencies, prefer well-maintained packages with good async support
+- Avoid heavy dependencies that would impact gateway startup time
+
+### Code Organization
+- Keep service implementations focused and single-purpose
+- Use dependency injection patterns consistent with the existing gateway architecture
+- Separate protocol logic from business logic
+- Follow the existing module structure under `src/`
+
+### Environment-Specific Notes
+- The project runs in Docker containers for production
+- Support both development (live reload) and production configurations
+- Ensure compatibility with Python 3.9+ as specified in `pyproject.toml`
+- Test code works properly in both WSL2 and native Linux environments
+
+### Git Workflow
+- Follow conventional commit messages
+- Run the full test suite before suggesting commits
+- Ensure code passes Black, Ruff, and MyPy checks
+- Update relevant documentation with code changes
+
+### IDE Integration
+- Respect the existing VS Code workspace settings
+- Use the project's configured linters and formatters
+- Follow the established debugging configuration
+- Integrate with the project's pytest configuration

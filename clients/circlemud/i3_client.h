@@ -1,17 +1,14 @@
 /* ************************************************************************
-*  Intermud3 Client for CircleMUD/tbaMUD                                 *
+*  Intermud3 Client for LuminariMUD                                      *
+*  Based on CircleMUD/tbaMUD implementation                              *
 *  Copyright (C) 2025                                                     *
 *                                                                         *
-*  This integration allows CircleMUD/tbaMUD to connect to the global     *
+*  This integration allows LuminariMUD to connect to the global          *
 *  Intermud3 network through the I3 Gateway service.                     *
 ************************************************************************ */
 
 #ifndef _I3_CLIENT_H_
 #define _I3_CLIENT_H_
-
-#include <pthread.h>
-#include <stdbool.h>
-#include <json-c/json.h>
 
 /* Configuration constants */
 #define I3_MAX_STRING_LENGTH    4096
@@ -46,11 +43,16 @@ typedef enum {
     I3_MSG_CHANNEL_LEAVE
 } i3_msg_type_t;
 
+/* Forward declarations for structs */
+struct i3_command;
+struct i3_event;
+struct i3_mud;
+
 /* I3 Command structure for outgoing commands */
 typedef struct i3_command {
     int id;
     char method[64];
-    json_object *params;
+    void *params;  /* JSON object pointer */
     struct i3_command *next;
 } i3_command_t;
 
@@ -62,7 +64,7 @@ typedef struct i3_event {
     char to_user[128];
     char channel[64];
     char message[I3_MAX_STRING_LENGTH];
-    json_object *data;
+    void *data;  /* JSON object pointer */
     struct i3_event *next;
 } i3_event_t;
 
@@ -71,7 +73,7 @@ typedef struct i3_channel {
     char name[64];
     int type;  /* 0 = public, 1 = private */
     char owner[128];
-    bool subscribed;
+    int subscribed;  /* Using int instead of bool for C89 */
     int member_count;
 } i3_channel_t;
 
@@ -82,7 +84,7 @@ typedef struct i3_mud {
     char mud_type[64];
     char admin_email[256];
     int port;
-    bool online;
+    int online;  /* Using int instead of bool for C89 */
     char services[256];  /* Comma-separated list */
     struct i3_mud *next;
 } i3_mud_t;
@@ -99,15 +101,15 @@ typedef struct {
     /* Connection state */
     i3_state_t state;
     int socket_fd;
-    bool authenticated;
+    int authenticated;
     time_t last_heartbeat;
     time_t connect_time;
     
-    /* Threading */
-    pthread_t thread_id;
-    pthread_mutex_t command_mutex;
-    pthread_mutex_t event_mutex;
-    pthread_mutex_t state_mutex;
+    /* Threading - using void pointers for pthread types */
+    void *thread_id;
+    void *command_mutex;
+    void *event_mutex;
+    void *state_mutex;
     
     /* Message queues */
     i3_command_t *command_queue_head;
@@ -133,10 +135,10 @@ typedef struct {
     unsigned long reconnects;
     
     /* Configuration */
-    bool enable_tell;
-    bool enable_channels;
-    bool enable_who;
-    bool auto_reconnect;
+    int enable_tell;
+    int enable_channels;
+    int enable_who;
+    int auto_reconnect;
     int reconnect_delay;
     int max_queue_size;
     
@@ -152,7 +154,7 @@ int i3_initialize(void);
 void i3_shutdown(void);
 int i3_connect(void);
 void i3_disconnect(void);
-bool i3_is_connected(void);
+int i3_is_connected(void);
 
 /* Thread functions */
 void *i3_client_thread(void *arg);
@@ -194,9 +196,20 @@ void i3_log(const char *format, ...);
 void i3_error(const char *format, ...);
 void i3_debug(const char *format, ...);
 
-/* JSON helpers */
-json_object *i3_create_request(const char *method, json_object *params);
-int i3_send_json(json_object *obj);
+/* JSON helpers - implementation specific */
+void *i3_create_request(const char *method, void *params);
+int i3_send_json(void *obj);
 int i3_parse_response(const char *json_str);
+
+/* Command declarations for interpreter.c */
+void do_i3tell(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3chat(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3who(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3finger(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3locate(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3mudlist(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3channels(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3config(struct char_data *ch, const char *argument, int cmd, int subcmd);
+void do_i3admin(struct char_data *ch, const char *argument, int cmd, int subcmd);
 
 #endif /* _I3_CLIENT_H_ */
