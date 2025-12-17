@@ -72,7 +72,7 @@ services:
     container_name: i3-grafana
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3010:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
