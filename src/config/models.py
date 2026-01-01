@@ -59,6 +59,7 @@ class RouterConnectionConfig(BaseModel):
 class RouterHostConfig(BaseModel):
     """Router host configuration."""
 
+    name: str = "*i4"  # Router name (e.g., "*i4", "*dalet", "*wpr")
     host: str
     port: int = 8080
     password: int = 0

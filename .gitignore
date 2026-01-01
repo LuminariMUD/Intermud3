@@ -248,3 +248,6 @@ channels.db
 mudlist.db
 banlist.txt
 *.router
+
+# ngrok config (contains authtoken)
+ngrok.yml

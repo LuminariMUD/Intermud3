@@ -1,0 +1,15 @@
+version: "3"
+agent:
+    authtoken: YOUR_NGROK_AUTHTOKEN_HERE
+    web_addr: 127.0.0.1:4042
+
+tunnels:
+    i3-websocket:
+        proto: http
+        addr: 8080
+        domain: i3.ngrok.dev
+        inspect: true
+
+    i3-tcp:
+        proto: tcp
+        addr: 8081

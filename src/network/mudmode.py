@@ -79,13 +79,16 @@ class MudModeProtocol:
         self._expected_length: int | None = None
 
     def encode_packet(self, packet: I3Packet) -> bytes:
-        """Encode an I3 packet to MudMode binary format.
+        """Encode an I3 packet to MudMode format.
+
+        MudMode format: 4-byte length prefix + LPC text + NUL terminator
+        The length includes the NUL terminator.
 
         Args:
             packet: I3 packet to encode
 
         Returns:
-            Encoded bytes with length prefix
+            Encoded bytes with length prefix and NUL terminator
 
         Raises:
             MudModeError: If encoding fails
@@ -94,36 +97,45 @@ class MudModeProtocol:
             # Convert packet to LPC array format
             lpc_data = packet.to_lpc_array()
 
-            # Encode to LPC binary format
+            # Encode to LPC text format
             encoded = self.lpc_encoder.encode(lpc_data)
 
-            # Add 4-byte length prefix
-            length = struct.pack(">I", len(encoded))
+            # Add NUL terminator
+            encoded_with_nul = encoded + b"\x00"
 
-            return length + encoded
+            # Add 4-byte length prefix (includes NUL)
+            length = struct.pack(">I", len(encoded_with_nul))
+
+            return length + encoded_with_nul
         except (LPCError, Exception) as e:
             raise MudModeError(f"Failed to encode packet: {e}")
 
     def encode_raw(self, data: Any) -> bytes:
-        """Encode raw data to MudMode binary format.
+        """Encode raw data to MudMode format.
+
+        MudMode format: 4-byte length prefix + LPC text + NUL terminator
+        The length includes the NUL terminator.
 
         Args:
             data: Raw data structure to encode
 
         Returns:
-            Encoded bytes with length prefix
+            Encoded bytes with length prefix and NUL terminator
 
         Raises:
             MudModeError: If encoding fails
         """
         try:
-            # Encode to LPC binary format
+            # Encode to LPC text format
             encoded = self.lpc_encoder.encode(data)
 
-            # Add 4-byte length prefix
-            length = struct.pack(">I", len(encoded))
+            # Add NUL terminator
+            encoded_with_nul = encoded + b"\x00"
 
-            return length + encoded
+            # Add 4-byte length prefix (includes NUL)
+            length = struct.pack(">I", len(encoded_with_nul))
+
+            return length + encoded_with_nul
         except (LPCError, Exception) as e:
             raise MudModeError(f"Failed to encode data: {e}")
 
@@ -192,34 +204,30 @@ class MudModeProtocol:
         """
         messages = []
 
-        # Add new data to buffer
+        # Add new data to buffer at the end
+        self._receive_buffer.seek(0, 2)  # SEEK_END
         self._receive_buffer.write(data)
 
         # Try to extract complete messages
         while True:
-            # Reset to read position
+            # Get current buffer contents
             self._receive_buffer.seek(0)
-            available = self._receive_buffer.tell()
-            self._receive_buffer.seek(0)
+            buffer_content = self._receive_buffer.getvalue()
 
             # Need at least 4 bytes for length
             if self._expected_length is None:
-                length_bytes = self._receive_buffer.read(4)
-                if len(length_bytes) < 4:
-                    # Not enough data for length
-                    self._receive_buffer.seek(0)
+                if len(buffer_content) < 4:
                     break
-
-                self._expected_length = struct.unpack(">I", length_bytes)[0]
+                self._expected_length = struct.unpack(">I", buffer_content[:4])[0]
 
             # Check if we have the complete message
-            self._receive_buffer.seek(4)  # Skip length bytes
-            message_data = self._receive_buffer.read(self._expected_length)
-
-            if len(message_data) < self._expected_length:
+            total_needed = 4 + self._expected_length
+            if len(buffer_content) < total_needed:
                 # Not enough data for complete message
-                self._receive_buffer.seek(0)
                 break
+
+            # Extract the message data (after 4-byte length prefix)
+            message_data = buffer_content[4:total_needed]
 
             # Decode the message
             try:
@@ -227,13 +235,13 @@ class MudModeProtocol:
                 messages.append(decoded)
             except LPCError as e:
                 # Log error but continue processing
-                # In production, this should use proper logging
                 print(f"Error decoding message: {e}")
 
             # Remove processed data from buffer
-            remaining = self._receive_buffer.read()
+            remaining = buffer_content[total_needed:]
             self._receive_buffer = BytesIO()
-            self._receive_buffer.write(remaining)
+            if remaining:
+                self._receive_buffer.write(remaining)
             self._expected_length = None
 
         return messages
@@ -277,10 +285,18 @@ class MudModeStreamProtocol(asyncio.Protocol):
 
     def data_received(self, data: bytes):
         """Called when data is received from the network."""
+        import structlog
+        logger = structlog.get_logger()
+        logger.debug("Raw data received from router",
+                     data_len=len(data),
+                     first_bytes=data[:50].hex() if len(data) > 0 else "empty")
+
         messages = self.mudmode.feed_data(data)
+        logger.debug("Parsed messages from router", message_count=len(messages))
 
         if self.on_message:
             for message in messages:
+                logger.debug("Processing message", message_type=type(message).__name__)
                 # Schedule coroutine in event loop
                 asyncio.create_task(self.on_message(message))
 

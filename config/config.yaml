@@ -38,6 +38,7 @@ mud:
     
 router:
   primary:
+    name: ${I3_ROUTER_NAME:*i4}
     host: ${I3_ROUTER_HOST:204.209.44.3}
     port: ${I3_ROUTER_PORT:8080}
     password: ${I3_ROUTER_PASSWORD:0}

@@ -40,7 +40,7 @@ class I3Gateway:
         if settings.router.primary:
             routers.append(
                 RouterInfo(
-                    name="*i3",
+                    name=settings.router.primary.name,
                     address=settings.router.primary.host,
                     port=settings.router.primary.port,
                     priority=0,
@@ -235,15 +235,20 @@ class I3Gateway:
                 services[service_name] = 1
 
         # Get current mudlist and chanlist IDs from state
-        old_mudlist_id = self.state_manager.mudlist_id
+        # Use 0 to request fresh full list on startup
+        old_mudlist_id = 0  # Force fresh request
         old_chanlist_id = 0  # We'll track this later
+
+        # Get current router name for target_mud field
+        current_router = self.connection_manager.get_current_router()
+        router_name = current_router.name if current_router else self.settings.router.primary.name
 
         # Create startup packet with correct field names
         startup = StartupPacket(
             ttl=200,
             originator_mud=self.settings.mud.name,
             originator_user="",
-            target_mud="*i3",
+            target_mud=router_name,
             target_user="",
             password=getattr(self.settings.mud, "password", 0),
             old_mudlist_id=old_mudlist_id,
@@ -262,6 +267,11 @@ class I3Gateway:
         )
 
         # Send startup packet
+        lpc_array = startup.to_lpc_array()
+        self.logger.debug("Startup packet LPC array",
+                          router_name=router_name,
+                          packet_fields=len(lpc_array),
+                          lpc_data=str(lpc_array))
         await self.send_packet(startup)
         self.logger.info("Sent startup packet", mud_name=self.settings.mud.name)
 

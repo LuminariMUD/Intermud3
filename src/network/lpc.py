@@ -2,6 +2,15 @@
 
 This module implements encoding and decoding of LPC (LPC interpreted language)
 data structures used in the Intermud-3 protocol.
+
+MudMode uses TEXT-based LPC serialization format:
+- Arrays: ({"element1","element2",123,})
+- Mappings: (["key":"value","key2":123,])
+- Strings: "text with \"escapes\""
+- Integers: 123
+- Null/0: 0 (zero integer)
+
+Reference: https://wotf.org/specs/mudmode.html
 """
 
 import struct
@@ -14,225 +23,265 @@ class LPCError(Exception):
 
 
 class LPCEncoder:
-    """Encodes Python objects to LPC binary format."""
+    """Encodes Python objects to LPC text format for MudMode protocol.
 
-    # LPC type markers
-    TYPE_STRING = 0x00
-    TYPE_INTEGER = 0x01
-    TYPE_ARRAY = 0x02
-    TYPE_MAPPING = 0x03
-    TYPE_BUFFER = 0x04
-    TYPE_OBJECT = 0x05
-    TYPE_FLOAT = 0x06
-    TYPE_NULL = 0x07
+    MudMode uses a text-based serialization format similar to JSON but
+    based on LPC literals. This encoder produces text output that can
+    be sent over MudMode connections.
+    """
 
     def encode(self, obj: Any) -> bytes:
-        """Encode a Python object to LPC binary format.
+        """Encode a Python object to LPC text format.
 
         Args:
             obj: Python object to encode (str, int, list, dict, None)
 
         Returns:
-            Encoded bytes in LPC format
+            Encoded bytes in LPC text format (UTF-8)
 
         Raises:
             LPCError: If object type is not supported
         """
-        buffer = BytesIO()
-        self._encode_value(obj, buffer)
-        return buffer.getvalue()
+        text = self._encode_value(obj)
+        return text.encode("utf-8")
 
-    def _encode_value(self, obj: Any, buffer: BytesIO) -> None:
-        """Recursively encode a value to the buffer."""
+    def _encode_value(self, obj: Any) -> str:
+        """Recursively encode a value to text."""
         if obj is None:
-            self._encode_null(buffer)
-        elif isinstance(obj, str):
-            self._encode_string(obj, buffer)
+            return "0"
+        elif isinstance(obj, bool):
+            return "1" if obj else "0"
         elif isinstance(obj, int):
-            self._encode_integer(obj, buffer)
+            return str(obj)
         elif isinstance(obj, float):
-            self._encode_float(obj, buffer)
+            return str(obj)
+        elif isinstance(obj, str):
+            return self._encode_string(obj)
         elif isinstance(obj, (list, tuple)):
-            self._encode_array(obj, buffer)
+            return self._encode_array(obj)
         elif isinstance(obj, dict):
-            self._encode_mapping(obj, buffer)
+            return self._encode_mapping(obj)
         elif isinstance(obj, bytes):
-            self._encode_buffer(obj, buffer)
+            # Encode bytes as a string
+            return self._encode_string(obj.decode("utf-8", errors="replace"))
         else:
             raise LPCError(f"Unsupported type for LPC encoding: {type(obj)}")
 
-    def _encode_null(self, buffer: BytesIO) -> None:
-        """Encode a null value."""
-        buffer.write(struct.pack("B", self.TYPE_NULL))
+    def _encode_string(self, s: str) -> str:
+        """Encode a string value with proper escaping."""
+        # Escape backslashes first, then quotes
+        escaped = s.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
 
-    def _encode_string(self, s: str, buffer: BytesIO) -> None:
-        """Encode a string value."""
-        buffer.write(struct.pack("B", self.TYPE_STRING))
-        data = s.encode("utf-8")
-        buffer.write(struct.pack(">I", len(data)))
-        buffer.write(data)
-
-    def _encode_integer(self, n: int, buffer: BytesIO) -> None:
-        """Encode an integer value."""
-        buffer.write(struct.pack("B", self.TYPE_INTEGER))
-        # LPC uses 32-bit signed integers
-        buffer.write(struct.pack(">i", n))
-
-    def _encode_float(self, f: float, buffer: BytesIO) -> None:
-        """Encode a float value."""
-        buffer.write(struct.pack("B", self.TYPE_FLOAT))
-        buffer.write(struct.pack(">d", f))
-
-    def _encode_array(self, arr: list | tuple, buffer: BytesIO) -> None:
+    def _encode_array(self, arr: list | tuple) -> str:
         """Encode an array/list value."""
-        buffer.write(struct.pack("B", self.TYPE_ARRAY))
-        buffer.write(struct.pack(">I", len(arr)))
-        for item in arr:
-            self._encode_value(item, buffer)
+        elements = [self._encode_value(item) for item in arr]
+        # LPC arrays: ({"elem1","elem2",})
+        return "({" + ",".join(elements) + ",})"
 
-    def _encode_mapping(self, mapping: dict, buffer: BytesIO) -> None:
+    def _encode_mapping(self, mapping: dict) -> str:
         """Encode a mapping/dict value."""
-        buffer.write(struct.pack("B", self.TYPE_MAPPING))
-        buffer.write(struct.pack(">I", len(mapping)))
+        pairs = []
         for key, value in mapping.items():
-            self._encode_value(key, buffer)
-            self._encode_value(value, buffer)
-
-    def _encode_buffer(self, data: bytes, buffer: BytesIO) -> None:
-        """Encode a buffer/bytes value."""
-        buffer.write(struct.pack("B", self.TYPE_BUFFER))
-        buffer.write(struct.pack(">I", len(data)))
-        buffer.write(data)
+            encoded_key = self._encode_value(key)
+            encoded_value = self._encode_value(value)
+            pairs.append(f"{encoded_key}:{encoded_value}")
+        # LPC mappings: (["key":"value",])
+        return "([" + ",".join(pairs) + ",])"
 
 
 class LPCDecoder:
-    """Decodes LPC binary format to Python objects."""
+    """Decodes LPC text format to Python objects.
 
-    # LPC type markers (same as encoder)
-    TYPE_STRING = 0x00
-    TYPE_INTEGER = 0x01
-    TYPE_ARRAY = 0x02
-    TYPE_MAPPING = 0x03
-    TYPE_BUFFER = 0x04
-    TYPE_OBJECT = 0x05
-    TYPE_FLOAT = 0x06
-    TYPE_NULL = 0x07
+    MudMode uses text-based LPC format:
+    - Arrays: ({"element1","element2",123,})
+    - Mappings: (["key":"value",])
+    - Strings: "text"
+    - Integers: 123 or -123
+    - Floats: 1.23
+    """
+
+    def __init__(self):
+        self._text = ""
+        self._pos = 0
 
     def decode(self, data: bytes) -> Any:
-        """Decode LPC binary data to a Python object.
+        """Decode LPC text data to a Python object.
 
         Args:
-            data: LPC encoded bytes
+            data: LPC encoded bytes (UTF-8 text)
 
         Returns:
             Decoded Python object
 
         Raises:
-            LPCError: If data is malformed or type is unsupported
+            LPCError: If data is malformed
         """
-        buffer = BytesIO(data)
-        result = self._decode_value(buffer)
-
-        # Check if all data was consumed
-        remaining = buffer.read()
-        if remaining:
-            raise LPCError(f"Extra data after decoding: {len(remaining)} bytes")
-
-        return result
-
-    def _decode_value(self, buffer: BytesIO) -> Any:
-        """Recursively decode a value from the buffer."""
-        type_byte = buffer.read(1)
-        if not type_byte:
-            raise LPCError("Unexpected end of data while reading type")
-
-        type_code = struct.unpack("B", type_byte)[0]
-
-        if type_code == self.TYPE_NULL:
-            return None
-        if type_code == self.TYPE_STRING:
-            return self._decode_string(buffer)
-        if type_code == self.TYPE_INTEGER:
-            return self._decode_integer(buffer)
-        if type_code == self.TYPE_FLOAT:
-            return self._decode_float(buffer)
-        if type_code == self.TYPE_ARRAY:
-            return self._decode_array(buffer)
-        if type_code == self.TYPE_MAPPING:
-            return self._decode_mapping(buffer)
-        if type_code == self.TYPE_BUFFER:
-            return self._decode_buffer(buffer)
-        raise LPCError(f"Unknown LPC type code: {type_code:#x}")
-
-    def _decode_string(self, buffer: BytesIO) -> str:
-        """Decode a string value."""
-        length_bytes = buffer.read(4)
-        if len(length_bytes) != 4:
-            raise LPCError("Unexpected end of data while reading string length")
-
-        length = struct.unpack(">I", length_bytes)[0]
-        data = buffer.read(length)
-        if len(data) != length:
-            raise LPCError(f"Expected {length} bytes for string, got {len(data)}")
+        # Strip trailing NUL if present
+        if data.endswith(b"\x00"):
+            data = data[:-1]
 
         try:
-            return data.decode("utf-8")
+            self._text = data.decode("utf-8")
         except UnicodeDecodeError as e:
-            raise LPCError(f"Invalid UTF-8 in string: {e}")
+            raise LPCError(f"Invalid UTF-8 in LPC data: {e}")
 
-    def _decode_integer(self, buffer: BytesIO) -> int:
-        """Decode an integer value."""
-        int_bytes = buffer.read(4)
-        if len(int_bytes) != 4:
-            raise LPCError("Unexpected end of data while reading integer")
+        self._pos = 0
+        result = self._decode_value()
 
-        return struct.unpack(">i", int_bytes)[0]
+        # Check for trailing data (skip whitespace)
+        self._skip_whitespace()
+        if self._pos < len(self._text):
+            pass  # Allow trailing data for partial packets
 
-    def _decode_float(self, buffer: BytesIO) -> float:
-        """Decode a float value."""
-        float_bytes = buffer.read(8)
-        if len(float_bytes) != 8:
-            raise LPCError("Unexpected end of data while reading float")
+        return result
 
-        return struct.unpack(">d", float_bytes)[0]
+    def _peek(self) -> str | None:
+        """Peek at current character without consuming."""
+        if self._pos >= len(self._text):
+            return None
+        return self._text[self._pos]
 
-    def _decode_array(self, buffer: BytesIO) -> list[Any]:
-        """Decode an array value."""
-        length_bytes = buffer.read(4)
-        if len(length_bytes) != 4:
-            raise LPCError("Unexpected end of data while reading array length")
+    def _advance(self) -> str:
+        """Consume and return current character."""
+        if self._pos >= len(self._text):
+            raise LPCError("Unexpected end of data")
+        ch = self._text[self._pos]
+        self._pos += 1
+        return ch
 
-        length = struct.unpack(">I", length_bytes)[0]
+    def _skip_whitespace(self):
+        """Skip whitespace characters."""
+        while self._pos < len(self._text) and self._text[self._pos] in " \t\n\r":
+            self._pos += 1
+
+    def _decode_value(self) -> Any:
+        """Decode a single value."""
+        self._skip_whitespace()
+
+        ch = self._peek()
+        if ch is None:
+            raise LPCError("Unexpected end of data")
+
+        if ch == '"':
+            return self._decode_string()
+        elif ch == '(':
+            return self._decode_compound()
+        elif ch == '-' or ch.isdigit():
+            return self._decode_number()
+        else:
+            raise LPCError(f"Unexpected character: {ch!r} at position {self._pos}")
+
+    def _decode_string(self) -> str:
+        """Decode a quoted string."""
+        if self._advance() != '"':
+            raise LPCError("Expected opening quote")
+
         result = []
-        for _ in range(length):
-            result.append(self._decode_value(buffer))
+        while True:
+            ch = self._advance()
+            if ch == '"':
+                break
+            elif ch == '\\':
+                # Escape sequence
+                next_ch = self._advance()
+                if next_ch == '"':
+                    result.append('"')
+                elif next_ch == '\\':
+                    result.append('\\')
+                elif next_ch == 'n':
+                    result.append('\n')
+                elif next_ch == 't':
+                    result.append('\t')
+                elif next_ch == 'r':
+                    result.append('\r')
+                else:
+                    result.append(next_ch)
+            else:
+                result.append(ch)
+
+        return ''.join(result)
+
+    def _decode_number(self) -> int | float:
+        """Decode a number (integer or float)."""
+        start = self._pos
+
+        # Handle negative
+        if self._peek() == '-':
+            self._advance()
+
+        # Read digits
+        while self._peek() and (self._peek().isdigit() or self._peek() == '.'):
+            self._advance()
+
+        num_str = self._text[start:self._pos]
+
+        if '.' in num_str:
+            return float(num_str)
+        return int(num_str)
+
+    def _decode_compound(self) -> list | dict:
+        """Decode an array or mapping."""
+        if self._advance() != '(':
+            raise LPCError("Expected '('")
+
+        ch = self._advance()
+        if ch == '{':
+            return self._decode_array()
+        elif ch == '[':
+            return self._decode_mapping()
+        else:
+            raise LPCError(f"Expected '{{' or '[' after '(', got {ch!r}")
+
+    def _decode_array(self) -> list:
+        """Decode an array: ({"elem1","elem2",})"""
+        result = []
+
+        while True:
+            self._skip_whitespace()
+            ch = self._peek()
+
+            if ch == ',':
+                self._advance()
+                continue
+            elif ch == '}':
+                self._advance()
+                break
+            else:
+                result.append(self._decode_value())
+
+        # Consume closing )
+        self._skip_whitespace()
+        if self._peek() == ')':
+            self._advance()
 
         return result
 
-    def _decode_mapping(self, buffer: BytesIO) -> dict[Any, Any]:
-        """Decode a mapping value."""
-        length_bytes = buffer.read(4)
-        if len(length_bytes) != 4:
-            raise LPCError("Unexpected end of data while reading mapping length")
-
-        length = struct.unpack(">I", length_bytes)[0]
+    def _decode_mapping(self) -> dict:
+        """Decode a mapping: (["key":"value",])"""
         result = {}
-        for _ in range(length):
-            key = self._decode_value(buffer)
-            value = self._decode_value(buffer)
-            result[key] = value
+
+        while True:
+            self._skip_whitespace()
+            ch = self._peek()
+
+            if ch == ',':
+                self._advance()
+                continue
+            elif ch == ']':
+                self._advance()
+                break
+            else:
+                key = self._decode_value()
+                self._skip_whitespace()
+                if self._peek() == ':':
+                    self._advance()
+                value = self._decode_value()
+                result[key] = value
+
+        # Consume closing )
+        self._skip_whitespace()
+        if self._peek() == ')':
+            self._advance()
 
         return result
-
-    def _decode_buffer(self, buffer: BytesIO) -> bytes:
-        """Decode a buffer value."""
-        length_bytes = buffer.read(4)
-        if len(length_bytes) != 4:
-            raise LPCError("Unexpected end of data while reading buffer length")
-
-        length = struct.unpack(">I", length_bytes)[0]
-        data = buffer.read(length)
-        if len(data) != length:
-            raise LPCError(f"Expected {length} bytes for buffer, got {len(data)}")
-
-        return data
