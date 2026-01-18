@@ -249,5 +249,5 @@ mudlist.db
 banlist.txt
 *.router
 
-# ngrok config (contains authtoken)
-ngrok.yml
+# ngrok.yml now uses env:VAR references, safe to commit
+# ngrok.yml

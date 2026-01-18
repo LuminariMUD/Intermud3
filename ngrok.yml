@@ -1,13 +1,13 @@
 version: "3"
 agent:
-    authtoken: YOUR_NGROK_AUTHTOKEN_HERE
+    authtoken: env:NGROK_AUTHTOKEN
     web_addr: 127.0.0.1:4042
 
 tunnels:
     i3-websocket:
         proto: http
         addr: 8080
-        domain: i3.ngrok.dev
+        domain: env:NGROK_DOMAIN
         inspect: true
 
     i3-tcp:
