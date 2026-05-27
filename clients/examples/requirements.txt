@@ -3,7 +3,8 @@ aiohttp>=3.8.0
 asyncio
 
 # Web client requirements (optional)
-fastapi>=0.68.0
+fastapi>=0.136.3
+starlette>=1.0.1,<2.0.0
 uvicorn>=0.15.0
 pydantic>=1.8.0
 
