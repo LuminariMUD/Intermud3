@@ -104,7 +104,7 @@ api:
     require_tls: false
     api_keys:
       - key: ${API_KEY_LUMINARI:luminari-i3-gateway-2025}
-        mud_name: "LuminariMUD"
+        mud_name: ${MUD_NAME:LuminariMUD}
         permissions: ["*"]
         rate_limit_override: 500
       - key: ${API_KEY_DEMO:demo-key-123}
