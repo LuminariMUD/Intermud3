@@ -488,7 +488,7 @@ For older browsers, consider using polyfills or transpiling with Babel.
 
 ## Node.js Compatibility
 
-- Node.js 12.0.0 or higher
+- Node.js 24.0.0 or higher
 - Requires the `ws` package for WebSocket support
 
 ## Contributing

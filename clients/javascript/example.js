@@ -103,7 +103,7 @@ class I3Example {
             console.error(`⚠️  Gateway error: ${data.message}`);
         });
 
-        this.client.on(EventType.GATEWAY_RECONNECTED, (data) => {
+        this.client.on(EventType.GATEWAY_RECONNECTED, () => {
             console.log('🔄 Gateway reconnected to I3 router');
         });
     }
@@ -378,7 +378,7 @@ class InteractiveCLI {
                     console.log(`Left channel: ${args[0]}`);
                     break;
 
-                case 'who':
+                case 'who': {
                     if (args.length < 1) {
                         console.log('Usage: who <mud>');
                         break;
@@ -386,8 +386,9 @@ class InteractiveCLI {
                     const users = await this.client.who(args[0]);
                     console.log(`Users on ${args[0]}: ${users.map(u => u.name).join(', ')}`);
                     break;
+                }
 
-                case 'finger':
+                case 'finger': {
                     if (args.length < 2) {
                         console.log('Usage: finger <mud> <user>');
                         break;
@@ -395,8 +396,9 @@ class InteractiveCLI {
                     const userInfo = await this.client.finger(args[0], args[1]);
                     console.log('User info:', JSON.stringify(userInfo, null, 2));
                     break;
+                }
 
-                case 'locate':
+                case 'locate': {
                     if (args.length < 1) {
                         console.log('Usage: locate <user>');
                         break;
@@ -404,24 +406,28 @@ class InteractiveCLI {
                     const locations = await this.client.locate(args[0]);
                     console.log(`User ${args[0]} found on: ${locations.map(l => l.name).join(', ')}`);
                     break;
+                }
 
-                case 'muds':
+                case 'muds': {
                     const muds = await this.client.mudlist();
                     console.log(`MUDs (${muds.length}):`);
                     muds.forEach(mud => {
                         console.log(`  ${mud.name} (${mud.status})`);
                     });
                     break;
+                }
 
-                case 'channels':
+                case 'channels': {
                     const channels = await this.client.channelList();
                     console.log(`Channels: ${channels.join(', ')}`);
                     break;
+                }
 
-                case 'stats':
+                case 'stats': {
                     const stats = this.client.getClientStats();
                     console.log('Client statistics:', JSON.stringify(stats, null, 2));
                     break;
+                }
 
                 case 'quit':
                     this.rl.close();

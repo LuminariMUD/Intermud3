@@ -183,7 +183,7 @@ All examples demonstrate proper I3 event handling:
 
 3. **Missing Dependencies**
    - Install required packages: `pip install -r requirements.txt`
-   - Check Python version compatibility (3.8+)
+   - Check Python version compatibility (3.12+)
 
 4. **Rate Limiting**
    - Respect gateway rate limits

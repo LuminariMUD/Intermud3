@@ -93,7 +93,7 @@ Intermud3/
 ├── docker-compose.yml          # Multi-container setup
 ├── docker-compose.override.yml # Development overrides
 ├── docker-compose.prod.yml     # Production setup
-├── LICENSE.md
+├── LICENSE
 ├── Makefile                    # Build automation
 ├── MANIFEST.in                 # Package manifest
 ├── pyproject.toml              # Project configuration
@@ -109,7 +109,7 @@ Intermud3/
 
 ```toml
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=83.0.0", "wheel>=0.47.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -117,39 +117,40 @@ name = "i3-gateway"
 version = "0.1.0"
 description = "Intermud3 Protocol Gateway - A standalone Python service for MUD-to-I3 network bridging"
 readme = "README.md"
-requires-python = ">=3.9"
-license = {text = "MIT"}
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 
 dependencies = [
-    "pyyaml>=6.0",
-    "structlog>=23.0",
-    "aiohttp>=3.9.0",
-    "pydantic>=2.0",
-    "python-dotenv>=1.0.0",
-    "click>=8.0",
-    "psutil>=5.9.0",
+    "pyyaml>=6.0.3",
+    "structlog>=26.1.0",
+    "aiohttp>=3.14.3",
+    "pydantic>=2.13.4",
+    "python-dotenv>=1.2.2",
+    "click>=8.4.2",
+    "psutil>=7.2.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21",
-    "pytest-cov>=4.0",
-    "pytest-mock>=3.11",
-    "black>=23.0",
-    "ruff>=0.1.0",
-    "mypy>=1.5",
-    "pre-commit>=3.3",
-    "types-pyyaml>=6.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
+    "black>=26.5.1",
+    "ruff>=0.16.0",
+    "mypy>=2.3.0",
+    "pre-commit>=4.6.1",
+    "types-pyyaml>=6.0.12.20260724",
 ]
 docs = [
-    "sphinx>=7.0",
-    "sphinx-rtd-theme>=1.3",
+    "sphinx>=9.1.0",
+    "sphinx-rtd-theme>=3.1.0",
 ]
 security = [
-    "bandit>=1.7",
-    "safety>=2.3",
-    "pip-audit>=2.6",
+    "bandit>=1.9.4",
+    "safety>=3.8.1",
+    "pip-audit>=2.10.1",
 ]
 
 [project.scripts]
@@ -160,7 +161,7 @@ i3-gateway = "src.__main__:main"
 
 #### **Ruff - Fast Python Linter (.ruff.toml)**
 ```toml
-target-version = "py39"
+target-version = "py312"
 line-length = 100
 
 [lint]
@@ -223,7 +224,7 @@ ignore = [
 ```toml
 [tool.black]
 line-length = 100
-target-version = ['py39', 'py310', 'py311']
+target-version = ['py312', 'py313', 'py314']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -299,7 +300,7 @@ exclude_lines = [
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -319,38 +320,37 @@ repos:
       - id: check-shebang-scripts-are-executable
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.16.0
     hooks:
-      - id: ruff
+      - id: ruff-check
         name: "Ruff linter"
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
         name: "Ruff formatter"
 
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 26.5.1
     hooks:
       - id: black
         name: "Format Python code with Black"
-        language_version: python3.9
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v2.3.0
     hooks:
       - id: mypy
         name: "Type check with MyPy"
         additional_dependencies:
-          - types-pyyaml>=6.0
-          - types-setuptools
-          - pydantic>=2.0
-          - aiohttp>=3.9.0
-          - structlog>=23.0
-          - click>=8.0
+          - types-pyyaml>=6.0.12.20260724
+          - types-setuptools>=83.0.0.20260724
+          - pydantic>=2.13.4
+          - aiohttp>=3.14.3
+          - structlog>=26.1.0
+          - click>=8.4.2
         args: [--ignore-missing-imports, --strict, --show-error-codes]
         exclude: ^tests/
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.10
+    rev: 1.9.4
     hooks:
       - id: bandit
         name: "Security check with Bandit"
@@ -358,30 +358,30 @@ repos:
         exclude: ^tests/
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.29.1
+    rev: v4.16.5
     hooks:
       - id: commitizen
         name: "Check commit message format"
       - id: commitizen-branch
         name: "Check branch naming convention"
-        stages: [push]
+        stages: [pre-push]
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 8.0.1
     hooks:
       - id: isort
         name: "Sort imports with isort"
         args: ["--profile", "black", "--line-length", "100"]
 
   - repo: https://github.com/python-poetry/poetry
-    rev: 1.8.4
+    rev: 2.4.1
     hooks:
       - id: poetry-check
         name: "Validate pyproject.toml"
         files: pyproject.toml
 
-  - repo: https://github.com/charliermarsh/docformatter
-    rev: v1.7.5
+  - repo: https://github.com/PyCQA/docformatter
+    rev: v1.7.8
     hooks:
       - id: docformatter
         name: "Format docstrings"
@@ -418,7 +418,7 @@ make setup           # Complete development setup
 
 ```dockerfile
 # Dockerfile (Active) - Multi-stage production build
-FROM python:3.11-slim as builder
+FROM python:3.14.6-slim AS builder
 
 WORKDIR /app
 
@@ -434,7 +434,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Final stage
-FROM python:3.11-slim
+FROM python:3.14.6-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -449,7 +449,7 @@ RUN useradd -m -u 1000 i3gateway && \
 WORKDIR /app
 
 # Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
@@ -657,4 +657,4 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines on:
 
 ## License
 
-MIT License - see [LICENSE.md](../LICENSE.md) for details
+MIT License - see [LICENSE](../../LICENSE) for details

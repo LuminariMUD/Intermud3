@@ -41,19 +41,21 @@
     "url": "https://github.com/your-org/intermud3-gateway/issues"
   },
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=24.0.0"
   },
   "dependencies": {
-    "ws": "^8.14.0"
+    "ws": "^8.21.1"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/ws": "^8.5.0",
-    "eslint": "^8.0.0",
-    "prettier": "^3.0.0"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.2",
+    "@types/ws": "^8.18.1",
+    "eslint": "^10.8.0",
+    "globals": "^17.8.0",
+    "prettier": "^3.9.6"
   },
   "peerDependencies": {
-    "ws": "^8.0.0"
+    "ws": "^8.21.1"
   },
   "peerDependenciesMeta": {
     "ws": {

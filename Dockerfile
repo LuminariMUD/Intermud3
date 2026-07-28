@@ -3,7 +3,7 @@
 # Includes WebSocket & TCP servers, event distribution, auth middleware
 
 # Multi-stage build for I3 Gateway
-FROM python:3.11-slim as builder
+FROM python:3.14.6-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Final stage
-FROM python:3.11-slim
+FROM python:3.14.6-slim
 
 # Install runtime dependencies (curl for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -38,7 +38,7 @@ RUN useradd -m -u 1000 i3gateway && \
 WORKDIR /app
 
 # Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code and client libraries

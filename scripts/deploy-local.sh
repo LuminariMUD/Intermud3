@@ -242,18 +242,15 @@ check_prerequisites() {
 
     local missing=()
 
-    log_step "Checking for Python 3.9+..."
+    log_step "Checking for Python 3.12+..."
     if command_exists python3; then
         local py_version
         py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        local py_major py_minor
-        py_major=$(echo "$py_version" | cut -d. -f1)
-        py_minor=$(echo "$py_version" | cut -d. -f2)
-        if [[ $py_major -ge 3 && $py_minor -ge 9 ]]; then
+        if python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 12))'; then
             log_success "Python $py_version found - A worthy interpreter!"
         else
-            log_error "Python $py_version found but 3.9+ required"
-            missing+=("python3.9+")
+            log_error "Python $py_version found but 3.12+ required"
+            missing+=("python3.12+")
         fi
     else
         log_error "Python3 not found"

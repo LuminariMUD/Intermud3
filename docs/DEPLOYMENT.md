@@ -21,7 +21,7 @@
 ## Prerequisites
 
 ### System Requirements
-- Python 3.9 or higher
+- Python 3.12 or higher
 - 512MB RAM minimum (1GB recommended)
 - 100MB disk space
 - Network connectivity to I3 routers

@@ -2,8 +2,6 @@
 # Phase 3 COMPLETE (2025-08-20): Full API implementation with WebSocket & TCP support
 # Test coverage: ~75-78% | 1200+ tests | Production-ready
 
-version: '3.8'
-
 services:
   i3-gateway:
     build:
@@ -48,7 +46,7 @@ services:
 
   # Optional: Add a monitoring service
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.13.1
     container_name: i3-prometheus
     restart: unless-stopped
     ports:
@@ -68,7 +66,7 @@ services:
 
   # Optional: Add Grafana for visualization
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.1.1
     container_name: i3-grafana
     restart: unless-stopped
     ports:
