@@ -6,6 +6,24 @@ as shipped until its acceptance evidence exists.
 
 ## Current priorities
 
+### Restore a green quality gate
+
+- Repair fixed-port and async-teardown behavior in API end-to-end tests.
+- Start mock routers before gateway connection attempts in integration
+  fixtures.
+- Resolve router-service, connection-manager, and connection-pool expectation
+  failures.
+- Wire router timeout/retry settings into the connection manager and implement
+  an actual protocol-safe keepalive or remove the inactive setting.
+- Move the intended GitHub Actions file under `.github/workflows/`, then link
+  hosted results rather than inferring them from configuration.
+- Reconcile `pyproject.toml` license metadata with the repository's Unlicense
+  text, and its Alpha classifier with the beta version label, before publishing
+  a distribution.
+- Replace the dated failure snapshot in
+  [Testing](projects/TESTING.md) only after the configured `pytest` gate exits
+  successfully.
+
 ### Publish the complete live command matrix
 
 - Record redacted, repeatable round trips for tell, emoteto, channel
@@ -55,6 +73,5 @@ as shipped until its acceptance evidence exists.
 - Source, Docker, systemd, and local-development deployment assets.
 - Live `*i4` registration and list synchronization.
 
-Historical phase plans live under [`projects/`](projects/). They are retained
+Historical phase plans live in the [project records](projects/README.md). They are retained
 for provenance, not used as the current roadmap.
-

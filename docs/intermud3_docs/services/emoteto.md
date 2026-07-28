@@ -1,5 +1,8 @@
 # Service: emoteto
 
+> Core packet path implemented by the gateway's tell service. A published live
+> end-to-end transcript remains an acceptance item.
+
 Send an emote to a user on a remote mud.
 
 ## Network Type

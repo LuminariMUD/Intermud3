@@ -1,5 +1,9 @@
 # Service: auth
 
+> Protocol reference only. The gateway has no registered I3 auth service and
+> no OOB transport. This is unrelated to local JSON-RPC API-key
+> authentication.
+
 Perform mud-level authentication for OOB communications.
 
 ## Purpose
@@ -83,10 +87,10 @@ Auth types:
 ## Example Flow
 
 ```
-1. MudA → Router → MudB: auth-mud-req
-2. MudB → Router → MudA: auth-mud-reply (key: 42789)
+1. MudA -> Router -> MudB: auth-mud-req
+2. MudB -> Router -> MudA: auth-mud-reply (key: 42789)
 3. MudA connects to MudB's OOB port
-4. MudA → MudB: oob-begin with auth_token=42789
+4. MudA -> MudB: oob-begin with auth_token=42789
 5. MudB validates token and allows connection
 6. Authenticated OOB communication proceeds
 ```

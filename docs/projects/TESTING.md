@@ -1,131 +1,111 @@
-# Testing TODO - Remaining Tasks
+# Testing
 
-## Current Status - ✅ GOALS ACHIEVED
-- **Current Coverage**: ~75-78% (estimated based on module coverage)
-- **Target Coverage**: 75% ✅ ACHIEVED
-- **Pass Rate**: 98.9% (685 passing out of 693 tests)
-- **Total Tests**: 700+ (increased from 387)
+This page records the test surface and its current reproducible status. It does
+not infer pass counts from collection or preserve old coverage estimates.
 
-## Test Improvements Completed
+## Current snapshot
 
-### API Test Failures Fixed (21 failures) ✅
-- [x] Fixed `test_handlers.py` - 5 failures
-  - [x] test_locate_request - Added "locate" permission to mock
-  - [x] test_locate_request_missing_username - Fixed permission validation
-  - [x] test_channel_listen/unlisten - Added subscription manager calls
-  - [x] test_error_handling_consistency - Fixed permission mocking
-  
-- [x] Fixed `test_protocol.py` - 3 failures
-  - [x] test_request_creation - Added jsonrpc parameter
-  - [x] test_error_response - Fixed JSONRPCError usage
-  - [x] test_response_to_dict - Changed to use to_json()
-
-- [x] Fixed `test_queue.py` - 7 failures
-  - [x] test_get_or_create_queue - Removed mock classes
-  - [x] test_get_queue_stats - Updated expected structure
-  - [x] test_process_queues_disconnected_session - Fixed iteration
-  - [x] test_worker_task_integration - Added process loop
-  - [x] test_global_instance_exists/initial_state - Added import
-  - [x] test_full_message_flow - Fixed queue processing
-
-- [x] Fixed `test_server.py` - 7 failures (5 WebSocket tests skipped)
-  - [x] test_status_handler - Fixed datetime mocking
-  - [x] test_cleanup_sessions_task - Fixed async task testing
-  - [x] test_ping_websockets_task - Fixed WebSocket failures
-  - [x] test_process_event_queues_task - Fixed event processing
-  - [x] test_health/liveness/metrics_endpoint_integration - Fixed mocking
-
-- [x] Fixed `test_session.py` - 1 failure
-  - [x] test_authenticate_valid_credential - Disabled auth in test
-
-### Event Bridge Test Failures Fixed (4 failures) ✅
-- [x] Fixed `test_event_bridge.py`
-  - [x] test_process_channel_message_packet - Fixed PacketType enum
-  - [x] test_process_channel_emote_packet - Fixed PacketType enum
-  - [x] test_process_error_packet - Fixed PacketType enum
-  - [x] test_packet_processing_flow - Fixed integration
-
-### Utility Test Failures Partially Fixed (7 out of 15)
-- [ ] Fix `test_connection_pool.py` - 8 failures
-  - [ ] test_acquire_connection_timeout - timeout logic
-  - [ ] test_acquire_with_health_check - health check issues
-  - [ ] test_get_stats - stats tracking
-  - [ ] test_creation_failure_recovery - error recovery
-  - [ ] test_close_exception_handling - exception handling
-  - [ ] test_cleanup_with_active_connections - cleanup logic
-  - [ ] test_idle_connection_cleanup - idle timeout
-  - [ ] test_very_short_timeouts - edge case handling
-
-- [x] Fixed `test_circuit_breaker.py` - 2 failures ✅
-  - [x] test_breaker_half_open_state - Fixed consecutive_successes expectation
-  - [x] test_state_transitions - Fixed state_changes tuple structure
-
-- [x] Fixed `test_retry.py` - 3 failures ✅
-  - [x] test_retry_on_timeout - Allowed jitter range
-  - [x] test_zero_max_attempts - Fixed to expect None result
-  - [x] test_unknown_backoff_strategy - Disabled jitter for exact comparison
-
-## Coverage Improvements Achieved
-
-### Service Modules - 96.58% coverage ✅ (was 0%)
-- [x] Created comprehensive test suite for all services
-- [x] 270+ tests covering all service functionality
-- [x] base.py: 93.17% coverage with ServiceRegistry tests
-- [x] channel.py: 98.08% coverage
-- [x] finger.py: 100% coverage ✅
-- [x] locate.py: 98.45% coverage
-- [x] who.py: 100% coverage ✅
-- [x] tell.py: 91.30% coverage
-- [x] router.py: 95.65% coverage
-
-### State Manager - 92.39% coverage ✅ (was 0%)
-- [x] Created 39 comprehensive tests
-- [x] TTLCache with expiration testing
-- [x] MUD list management tests
-- [x] Channel management tests
-- [x] Session tracking tests
-- [x] Persistence and concurrent access tests
-
-### Network and Core Modules - Partial Coverage
-- [x] Created tests for `src/network/connection.py`
-- [x] Created tests for `src/network/mudmode.py` (42% coverage)
-- [x] Created tests for `src/gateway.py`
-- [x] Created tests for `src/__main__.py`
-- [x] Enhanced `src/utils/shutdown.py` tests (37% coverage)
-
-## Integration & Performance Test Issues
-
-### Integration Tests (17 failures)
-- [ ] Mock I3 router connections to prevent timeouts
-- [ ] Add proper gateway mock fixtures
-- [ ] Fix async event loop management
-- [ ] Update auth config format in tests
-
-### Performance Tests (16 failures)
-- [ ] Add resource limits to prevent hanging
-- [ ] Mock heavy operations in stress tests
-- [ ] Add timeout decorators
-- [ ] Fix gateway instantiation issues
-
-## Commands to Run
+Observed on 2026-07-28 with Python 3.12.3 at code commit `c5ffd8e`:
 
 ```bash
-# Check current coverage
-./venv/bin/python -m pytest tests/unit/ --cov=src --cov-report=term-missing
-
-# Run specific test files
-./venv/bin/python -m pytest tests/unit/api/ -v --tb=short
-
-# Generate HTML coverage report
-./venv/bin/python -m pytest tests/unit/ --cov=src --cov-report=html
-
-# Run with markers
-./venv/bin/python -m pytest tests/unit/ -m "not slow" --cov=src
+./venv/bin/python -m src --dry-run
 ```
 
-## Success Criteria ✅ ACHIEVED
-- [x] Overall test coverage ≥ 75% ✅ (~75-78% achieved)
-- [x] Test pass rate > 75% ✅ (98.9% achieved)
-- [x] All service modules have >50% coverage ✅ (96.58% average)
-- [x] Major test failures fixed ✅ (32 out of 40 fixed)
-- [x] Comprehensive test suite created ✅ (700+ tests)
+Result: configuration valid; CLI reported `0.4.5-beta`.
+
+```bash
+./venv/bin/python -m pytest --collect-only -q -o addopts=''
+```
+
+Result: **940 tests collected** in 0.40 seconds.
+
+Collection proves inventory only. It does not prove those tests pass.
+
+The live-command regression file was also run directly:
+
+```bash
+./venv/bin/python -m pytest \
+  tests/regression/test_i3_command_regressions.py \
+  -q -o addopts=''
+```
+
+Result: **8 passed**, with deprecation warnings, in 0.26 seconds.
+
+## Full-gate status
+
+The full `pytest` gate is **not green in the audited environment** and must not
+be represented as such.
+
+Observed blockers include:
+
+- API end-to-end tests that bind fixed port 8080 and use an async teardown
+  pattern that is not awaited by the current aiohttp/pytest stack, causing the
+  next test to collide with the first server;
+- mock-gateway integration setup that starts the gateway before its mock router
+  is listening;
+- router-service expectations that differ from current forwarding behavior;
+- connection-manager/fallback lifecycle expectation failures;
+- multiple connection-pool timeout, cleanup, and statistics failures;
+- legacy LPC tests that still expect the abandoned binary type-tag format
+  instead of deployed LPC text.
+
+A focused run across regression, services, network units, and packet-model
+tests produced **420 passes and 12 failures**. These numbers are a dated
+diagnostic result, not a release badge.
+
+## Suite layout
+
+| Path | Scope |
+|---|---|
+| `tests/unit/` | Packet models, codecs, network/state utilities, and API components |
+| `tests/services/` | I3 service request/reply/routing behavior |
+| `tests/api/` | Authentication and event-system behavior |
+| `tests/integration/` | Mock-router and local API composition |
+| `tests/regression/` | Regressions derived from live command auditing |
+| `tests/performance/` | Synthetic throughput, stress, and latency harnesses |
+
+The current protocol boundary also has a split result:
+
+```bash
+./venv/bin/python -m pytest \
+  tests/unit/network/test_mudmode.py \
+  tests/unit/test_packet.py \
+  tests/unit/test_packet_fixed.py \
+  tests/regression/test_i3_command_regressions.py \
+  -q -o addopts=''
+```
+
+Result: **55 passed** with deprecation warnings in 0.28 seconds.
+
+By contrast, `tests/unit/test_lpc.py` still asserts the retired binary
+type-tagged codec. The running implementation correctly uses deployed LPC
+text, so that legacy file currently contributes 11 failures and must be
+rewritten rather than used as evidence for binary behavior.
+
+## Commands
+
+Run the configured test and coverage gate:
+
+```bash
+pytest
+```
+
+Run a focused suite without repository-wide coverage options:
+
+```bash
+python -m pytest tests/regression -q -o addopts=''
+python -m pytest tests/unit/network -q -o addopts=''
+python -m pytest tests/integration -q -o addopts=''
+```
+
+Use `-o addopts=''` only to accelerate diagnosis. The default configuration
+enables source coverage and requires 80% line coverage. Until `pytest` exits
+successfully with that configuration, the coverage gate is not satisfied.
+
+## Evidence rules
+
+- Record the command, environment, commit, exit status, and warnings.
+- Separate mock-router, test-router, and production-router observations.
+- Do not call a performance threshold a production SLA.
+- Do not describe an unrun test file as coverage.
+- Keep known failures visible until a clean rerun replaces this snapshot.

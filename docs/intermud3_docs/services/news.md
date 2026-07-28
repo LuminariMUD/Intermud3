@@ -1,5 +1,8 @@
 # Service: news
 
+> Historical protocol reference only. The gateway does not implement the OOB
+> transport, authentication, storage, or news handlers described below.
+
 Propagate news posts between muds.
 
 ## Network Type

@@ -4,24 +4,24 @@ Intermud3 Gateway is a single-process asynchronous bridge with two protocol
 boundaries:
 
 ```text
-┌──────────────────── local/private side ────────────────────┐
-│                                                            │
-│   MUD process ── WebSocket JSON-RPC or TCP JSON-RPC ──┐    │
-│                                                       │    │
-│   admin/monitor ── HTTP health + metrics ─────────────┤    │
-│                                                       ▼    │
-│             API server, sessions, events, rate limits      │
-└───────────────────────────┬────────────────────────────────┘
-                            │ typed gateway operations
-                            ▼
++-------------------- local/private side --------------------+
+|                                                            |
+|   MUD process -- WebSocket JSON-RPC or TCP JSON-RPC --+    |
+|                                                       |    |
+|   admin/monitor -- HTTP health + metrics -------------+    |
+|                                                       v    |
+|             API server, sessions, events, rate limits      |
++---------------------------+--------------------------------+
+                            | typed gateway operations
+                            v
                services, packet models, state
-                            │
-                            ▼
+                            |
+                            v
              MudMode framing + LPC serialization
-                            │ persistent TCP
-┌───────────────────────────▼────────────────────────────────┐
-│                    Intermud-3 router                       │
-└──────────────────── public/upstream side ──────────────────┘
+                            | persistent TCP
++---------------------------v--------------------------------+
+|                    Intermud-3 router                       |
++-------------------- public/upstream side ------------------+
 ```
 
 The local MUD never parses LPC and the router never sees local JSON-RPC.
@@ -66,7 +66,11 @@ MudMode/LPC representation.
 
 `ConnectionManager` selects configured routers by priority, tracks connection
 state/counters, applies per-router exponential backoff with jitter, and
-schedules reconnection after a lost transport.
+schedules reconnection after a lost transport. The current gateway passes
+fixed connection/keepalive intervals rather than the router settings model, and
+the keepalive task wakes but does not transmit a packet. Treat the transport's
+automatic reconnect as implemented machinery, not a completed keepalive or
+bounded-retry guarantee.
 
 ### Packet models
 
@@ -93,7 +97,7 @@ Registered service classes consume typed packets:
 - `WhoService`: who requests/replies
 - `FingerService`: finger requests/replies
 - `LocateService`: locate requests/replies
-- `RouterService`: routing/support behavior
+- `RouterService`: routing/support behavior used directly by the gateway
 
 Services may produce a response packet. The gateway sends that response once;
 ordinary inbound broadcasts are consumed and exposed locally, never reflected
@@ -141,34 +145,35 @@ remote-MUD availability.
 
 ```text
 load dotenv/YAML
-  → validate settings
-  → load persisted mud/channel state
-  → register enabled core services
-  → connect router TCP
-  → send startup-req-3
-  → receive startup-reply
-  → persist assigned router password
-  → receive mudlist/chanlist deltas
-  → report router-aware readiness
-  → serve local API throughout
+  -> validate settings
+  -> load persisted mud/channel state
+  -> register enabled core services
+  -> connect router TCP
+  -> connection callback sends startup-req-3
+  -> start the local API after the initial connect attempt
+  -> receive startup-reply and enter I3 READY state
+  -> persist assigned router password
+  -> receive mudlist/chanlist data
 ```
 
 The API listener starts even when the first router connection fails, allowing
 health inspection while connection machinery works. `/health` therefore means
-the local API is alive; `/health/ready` is the upstream-aware gate.
+the local API is alive. `/health/ready` tests whether the router TCP transport
+is connected; it can become 200 before startup acceptance and list
+synchronization complete, so it is not a full protocol-synchronization gate.
 
 ## Incoming data flow
 
 ```text
 router bytes
-  → frame buffer
-  → LPC decoder
-  → PacketFactory
-  → gateway packet queue
-  ├─ support packet → gateway/state
-  └─ service packet → service registry
-       ├─ optional response → router
-       └─ event bridge → filtered API sessions
+  -> frame buffer
+  -> LPC decoder
+  -> PacketFactory
+  -> gateway packet queue
+  +- support packet -> gateway/state
+  +- service packet -> service registry
+       +- optional response -> router
+       +- event bridge -> filtered API sessions
 ```
 
 Malformed frames or packets are rejected/logged at the earliest layer that has
@@ -179,12 +184,12 @@ service.
 
 ```text
 authenticated API request
-  → method handler
-  → typed packet
-  → LPC array
-  → LPC text + NUL
-  → length-prefixed frame
-  → current router TCP transport
+  -> method handler
+  -> typed packet
+  -> LPC array
+  -> LPC text + NUL
+  -> length-prefixed frame
+  -> current router TCP transport
 ```
 
 The authenticated session supplies `originator_mud`; callers supply the local
@@ -217,15 +222,15 @@ The normal topology is one gateway identity per MUD:
 
 ```text
 private host/network
-├── MUD process
-├── Intermud3 Gateway
-└── optional reverse proxy / metrics collector
-        │
-        └── outbound TCP to one I3 router
++-- MUD process
++-- Intermud3 Gateway
++-- optional reverse proxy / metrics collector
+        |
+        +-- outbound TCP to one I3 router
 ```
 
 The process does not require inbound public access from the I3 router. Only the
-gateway’s outbound router connection is needed unless external local-API
+gateway's outbound router connection is needed unless external local-API
 clients are intentionally supported.
 
 ## Explicit non-claims
@@ -242,4 +247,3 @@ The current architecture does not imply:
 
 Those boundaries keep the documented system aligned with the running code and
 the [roadmap](ROADMAP.md).
-

@@ -1,5 +1,8 @@
 # Service: mail
 
+> Historical protocol reference only. The gateway does not implement the OOB
+> transport, authentication, storage, or mail handlers described below.
+
 Propagate mail items between muds.
 
 ## Network Type
@@ -61,7 +64,7 @@ Delivered over the OOB network to the target mud's out-of-band TCP port:
     "mail",
     12345,
     "johndoe",
-    ([ 
+    ([
         "TargetMud": ({ "janedoe", "bobsmith" }),
         "OtherMud": ({ "alice" })
     ]),

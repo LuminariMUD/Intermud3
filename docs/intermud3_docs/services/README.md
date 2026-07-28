@@ -1,59 +1,46 @@
-# Intermud-3 Services
+# I3 service reference and gateway matrix
 
-There are eleven services covered by the Intermud-3 protocol:
+The protocol pages in this directory cover more of I3 than this gateway
+implements. "Documented" and "advertised at startup" are not synonyms.
 
-## Communication Services
-- [tell](tell.md) - Send a message to a user on a remote mud
-- [emoteto](emoteto.md) - Send an emote to a user on a remote mud
-- [channel](channel.md) - Send a string/emote/soul between muds
+## Current gateway scope
 
-## Information Services
-- [who](who.md) - Get a list of users on a remote mud
-- [finger](finger.md) - Get information about a particular user on a remote mud
-- [locate](locate.md) - Locate a player on remote mud(s)
+| Service | Router packets | Gateway status |
+|---|---|---|
+| [tell](tell.md) / [emoteto](emoteto.md) | `tell`, `emoteto` | Implemented by the tell service; local receive/send events and regressions exist |
+| [channel](channel.md) | `channel-m`, `channel-e`, listen/list traffic; partial `channel-t`/control paths | Core message, emote, listen, and chanlist paths implemented; targeted emote, admin, filter, and chan-who behavior is partial |
+| [who](who.md) | `who-req`, `who-reply` | Implemented; remote requests can be answered from fresh `presence_sync` state |
+| [finger](finger.md) | `finger-req`, `finger-reply` | Implemented; reply fields come from the public presence snapshot |
+| [locate](locate.md) | `locate-req`, `locate-reply` | Implemented; local match and remote reply paths exist |
+| [auth](auth.md) | `auth-mud-*` | Protocol reference only; no registered gateway service |
+| [ucache](ucache.md) | `ucache-update` and related packets | Protocol reference only; no registered gateway service |
+| [mail](mail.md) | OOB mail packets | Protocol reference only; no OOB transport/handler |
+| [news](news.md) | OOB news packets | Protocol reference only; no OOB transport/handler |
+| [file](file.md) | OOB file packets | Protocol reference only; no OOB transport/handler |
 
-## Data Transfer Services
-- [news](news.md) - Propagate news posts between muds
-- [mail](mail.md) - Propagate mail items between muds  
-- [file](file.md) - Transfer files between muds
+The startup builder currently advertises enabled `tell`, `channel`, `who`,
+`finger`, and `locate` services. `emoteto` is handled by the tell service rather
+than advertised as a separate entry. Optional mail/news/file settings can make
+the startup packet advertise those names even though handlers do not exist, so
+leave those settings disabled.
 
-## System Services
-- [auth](auth.md) - Perform mud or user authentication
-- [ucache](ucache.md) - Cache information about remote users
+Configuration models also contain auth, ucache, chanlist, and chan-who flags
+that the current startup builder does not advertise independently. Presence of
+a config field is not evidence of runtime support.
 
-## Service Availability
+## Evidence level
 
-Services are declared in the `startup-req-3` packet's services mapping. Standard services have a value of 1:
+Core service packet paths have automated tests and regressions. The
+2026-07-28 live snapshot proves router startup and real list decoding, while a
+published end-to-end live transcript for each message/query service remains an
+open acceptance item. See [Validation](../../VALIDATION.md).
 
-```lpc
-([
-    "tell": 1,
-    "emoteto": 1,
-    "who": 1,
-    "finger": 1,
-    "locate": 1,
-    "channel": 1,
-    "news": 1,
-    "mail": 1,
-    "file": 1,
-    "auth": 1,
-    "ucache": 1
-])
-```
+## Network types
 
-## Extended Services
+- Tell, channel, who, finger, locate, auth, and ucache are described as
+  in-band services carried through I3 routers.
+- Mail, news, and file are historical OOB services using separate direct
+  connections.
 
-Non-standard services may also be specified with service-specific information:
-
-- **smtp**: port-number - SMTP mail interface port
-- **ftp**: port-number - FTP service port
-- **nntp**: port-number - NNTP news server port
-- **http**: port-number - WWW server (httpd) port
-- **rcp**: port-number - Remote Creator server port
-- **amcp**: version-string - AMCP support with version
-
-## Network Usage
-
-Services use different network types:
-- **In-band**: Fast response messages (tell, emoteto, who, finger, locate, channel, auth, ucache)
-- **Out-of-band (OOB)**: Large data transfers (news, mail, file)
+This gateway currently implements only the in-band core listed as implemented
+above.

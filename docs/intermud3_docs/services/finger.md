@@ -1,5 +1,8 @@
 # Service: finger
 
+> Core request/reply packet path implemented. The gateway answers from a fresh
+> local `presence_sync` snapshot and emits remote answers as API events.
+
 Get information about a particular user on a remote mud.
 
 ## Network Type

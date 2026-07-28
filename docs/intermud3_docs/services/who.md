@@ -1,5 +1,8 @@
 # Service: who
 
+> Core request/reply packet path implemented. The gateway answers from a fresh
+> local `presence_sync` snapshot and emits remote answers as API events.
+
 Get a list of users on a remote mud.
 
 ## Network Type

@@ -1,6 +1,6 @@
 {
   "name": "i3-gateway-client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "JavaScript/Node.js client library for the Intermud3 Gateway API",
   "main": "i3-client.js",
   "types": "i3-client.d.ts",

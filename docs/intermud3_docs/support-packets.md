@@ -1,5 +1,9 @@
 # Support Packets
 
+> Protocol reference. The gateway implements the startup, startup reply,
+> mudlist, chanlist, error, and shutdown-related subset needed for its
+> MUD-to-router session; not every support packet described here has a handler.
+
 Support packets handle maintenance, connection management, and error reporting within the Intermud-3 network.
 
 ## error
@@ -34,15 +38,15 @@ Delivered to router when mud first establishes connection.
     0,
     target_mudname,        // Router name
     0,
-    
+
     password,              // (int) 0 for new muds
     old_mudlist_id,        // (int) Current mudlist version
     old_chanlist_id,       // (int) Current channel list version
-    
+
     // Mud information
     player_port,           // (int) Player connection port
     imud_tcp_port,         // (int) OOB TCP port
-    imud_udp_port,         // (int) OOB UDP port  
+    imud_udp_port,         // (int) OOB UDP port
     mudlib,                // (string) Mudlib name
     base_mudlib,           // (string) Base mudlib
     driver,                // (string) Driver version

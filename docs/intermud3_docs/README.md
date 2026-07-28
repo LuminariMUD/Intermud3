@@ -11,7 +11,7 @@ Accordingly:
 
 - the original specification explains intent and vocabulary;
 - current router/operator references describe deployed practice;
-- this repository’s packet models and regression tests define what the gateway
+- this repository's packet models and regression tests define what the gateway
   sends and accepts;
 - [live validation](../VALIDATION.md) establishes interoperability.
 
@@ -41,8 +41,8 @@ because the proposal was written for MudOS.
 ## Gateway scope versus protocol scope
 
 These pages include services that are part of the wider I3 protocol even when
-the gateway does not advertise or implement them. The authoritative gateway
+the gateway has no registered handler for them. The authoritative gateway
 status is the [service matrix](services/README.md). In particular, mail, news,
 file transfer, ucache, and I3 OOB authentication are protocol references today,
-not shipped gateway services.
-
+not shipped gateway services. Leave optional OOB advertisement settings
+disabled until matching handlers exist.

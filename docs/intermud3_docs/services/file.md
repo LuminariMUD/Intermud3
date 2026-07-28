@@ -1,5 +1,9 @@
 # Service: file
 
+> Historical protocol reference only. The gateway does not implement the OOB
+> transport, authentication, filesystem sandbox, or file handlers described
+> below.
+
 Transfer files between muds.
 
 ## Network Type

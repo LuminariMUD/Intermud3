@@ -2,7 +2,7 @@
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![I3 protocol](https://img.shields.io/badge/Intermud--3-v3-6f42c1)](docs/intermud3_docs/README.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f)](LICENSE)
+[![License: Unlicense](https://img.shields.io/badge/License-Unlicense-2ea44f)](LICENSE)
 
 Intermud3 Gateway is a modern Python sidecar that connects any MUD engine to the
 live Intermud-3 network. It owns MudMode framing, LPC serialization, router
@@ -12,7 +12,7 @@ JSON-RPC 2.0 interface over WebSocket or newline-delimited TCP.
 The useful distinction is simple:
 
 ```text
-your MUD  <── JSON-RPC ──>  Intermud3 Gateway  <── MudMode/I3v3 ──>  I3 router
+your MUD  <-- JSON-RPC -->  Intermud3 Gateway  <-- MudMode/I3v3 -->  I3 router
 ```
 
 That lets Diku/CircleMUD derivatives, custom engines, web services, and other
@@ -26,7 +26,7 @@ current gateway established a live session with `*i4` at
 `204.209.44.3:8080`, completed `startup-req-3`/`startup-reply`, persisted the
 router-issued password, reached the ready state, and synchronized:
 
-- 163 MUD records at mudlist ID `73031055`
+- 164 MUD records at mudlist ID `73041485`
 - 169 channel records
 - an authenticated local TCP API session from LuminariMUD
 
@@ -44,11 +44,11 @@ are evidence from that run, not permanent size claims.
 | Core services | `tell`, `emoteto`, channel messages/emotes/listen, `who`, `finger`, and `locate` |
 | Local API | 20 JSON-RPC methods over WebSocket (`/ws`) and newline-delimited TCP |
 | Events | Incoming tells, emotes, channel traffic, query replies, router errors, and connection notifications |
-| State | Persisted mud/channel state, channel history, API sessions, and local player-presence snapshots |
+| State | Persisted mud/channel state; in-memory API sessions and short-lived local player-presence snapshots; channel-history API is currently a placeholder |
 | Operations | Health, liveness, readiness, Prometheus-text metrics, structured logs, Docker and systemd assets |
 | Integrations | Python and JavaScript clients/examples plus a CircleMUD-oriented C reference integration |
 
-The release is currently `0.4.4-beta`. “Beta” describes the evolving local API
+The release is currently `0.4.6-beta`. "Beta" describes the evolving local API
 and client packaging; it does not mean the gateway has never spoken to a real
 router. See the [service matrix](docs/intermud3_docs/services/README.md) for
 packet-level scope and [client status](#client-status) for the exact maturity of
@@ -178,7 +178,7 @@ than pretending every language binding has identical maturity.
 | CircleMUD C | Reference code for embedding the TCP API in a CircleMUD-style loop; review the documented implemented subset before adopting | [C client status](clients/circlemud/CIRCLEMUD_CLIENT_AUDIT.md) |
 
 The gateway protocol is language-neutral. A client only needs to authenticate,
-send JSON-RPC objects, consume server events, and—in TCP mode—terminate each
+send JSON-RPC objects, consume server events, and-in TCP mode-terminate each
 JSON object with `\n`.
 
 ## Docker
@@ -192,11 +192,18 @@ docker compose logs -f i3-gateway
 
 The Compose file persists `state/` and `logs/`. Router credentials are stored
 under the state directory; protect that volume as a secret-bearing asset.
-Prometheus and Grafana are optional profiles:
+Prometheus and Grafana are optional profile scaffolding, not a validated
+monitoring stack. The checked-in Compose file maps host port `9090` for both
+the gateway and Prometheus, so change or remove the gateway's unused
+`9090:9090` mapping before enabling that profile:
 
 ```bash
 docker compose --profile monitoring up -d
 ```
+
+The Prometheus configuration also references services not defined by the base
+Compose file, and the Grafana provisioning directories are not checked in.
+Review the deployment guide before relying on the profile.
 
 For host, systemd, reverse-proxy, and production configuration guidance, use
 the [deployment guide](docs/DEPLOYMENT.md).
@@ -236,5 +243,7 @@ follow the [Code of Conduct](docs/CODE_OF_CONDUCT.md).
 
 ## License
 
-Intermud3 Gateway is available under the [MIT License](LICENSE).
-
+The repository's [LICENSE](LICENSE) contains the Unlicense/public-domain
+dedication. `pyproject.toml` currently declares MIT instead, so package
+metadata is inconsistent and should be corrected before publishing a
+distribution.

@@ -1,5 +1,10 @@
 # Logical Network Layout
 
+> Historical I3 architecture reference. Router topology, retention timers, and
+> operator policy below are not runtime guarantees made by this gateway. See
+> [current router references](../gateway_list.md) and
+> [gateway architecture](../ARCHITECTURE.md).
+
 ## Network Architecture
 
 The logical network of muds is organized into a set of fully connected routers, each acting as a hub for an arbitrary set of muds.
@@ -13,7 +18,7 @@ The logical network of muds is organized into a set of fully connected routers, 
 ### Mud-Router Connection
 - An active TCP session (in MUD mode) is maintained between a mud and its router
 - The mud is responsible for:
-  - Opening the connection (see startup-req-2 packet)
+  - Opening the connection (the gateway uses `startup-req-3`)
   - Maintaining the connection
   - Reconnecting if necessary
   - Shutting down gracefully
@@ -32,13 +37,14 @@ The network of TCP sessions between routers and muds is used for "in band" trans
 Some services use "out of band" transmissions, separate from the main network:
 - Each mud listens at a TCP port for incoming OOB connections
 - Connections are opened as needed and closed when transmission completes
-- Current OOB services include:
+- The historical proposal defines these OOB service families:
   - Mail
   - News
   - File transfers
 
 ### UDP Port
-Each mud may maintain a UDP port for specific OOB transmissions. Currently, there are no UDP-based OOB services, so this port is typically not opened.
+Each mud may advertise a UDP port. The historical proposal does not define a
+UDP OOB service, and this gateway advertises no OOB UDP listener.
 
 ## MUD Naming
 

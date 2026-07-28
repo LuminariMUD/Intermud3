@@ -1,5 +1,9 @@
 # Reference
 
+> Protocol packet catalog, not a gateway capability list. Check the
+> [service matrix](services/README.md) and packet models before relying on a
+> listed type.
+
 ## Error Codes
 
 ### Router Error Codes

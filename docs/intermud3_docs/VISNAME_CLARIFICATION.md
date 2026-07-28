@@ -1,82 +1,47 @@
-# VISNAME FIELD CLARIFICATION - DEFINITIVE GUIDE
+# Tell and emoteto `visname`
 
-## THE ABSOLUTE TRUTH ABOUT VISNAME
+The deployed I3 `tell` and `emoteto` packet shape contains eight array
+elements:
 
-### TELL PACKETS - 8 FIELDS TOTAL
-The I3 protocol specification REQUIRES that tell packets have **EXACTLY 8 FIELDS**:
+| Index | Field |
+|---:|---|
+| 0 | packet type: `tell` or `emoteto` |
+| 1 | TTL |
+| 2 | originator MUD |
+| 3 | originator user |
+| 4 | target MUD |
+| 5 | target user |
+| 6 | originator display name (`visname`) |
+| 7 | message/emote text |
 
-```
-Position 0: "tell" (packet type)
-Position 1: TTL (integer)
-Position 2: originator_mud (string)
-Position 3: originator_user (string)
-Position 4: target_mud (string)
-Position 5: target_user (string - MUST be lowercased)
-Position 6: visname (string - REQUIRED, defaults to originator_user)
-Position 7: message (string)
-```
+`visname` is the player-facing form of the sender name. It is distinct from
+the routing identity in `originator_user`, although implementations commonly
+use the originator user as the default display name. Target user names are
+normally normalized to lowercase for remote lookup.
 
-**TOTAL FIELDS: 8**
+Examples:
 
-### EMOTETO PACKETS - 8 FIELDS TOTAL
-The I3 protocol specification REQUIRES that emoteto packets have **EXACTLY 8 FIELDS**:
-
-```
-Position 0: "emoteto" (packet type)
-Position 1: TTL (integer)
-Position 2: originator_mud (string)
-Position 3: originator_user (string)
-Position 4: target_mud (string)
-Position 5: target_user (string - MUST be lowercased)
-Position 6: visname (string - REQUIRED, defaults to originator_user)
-Position 7: message (string)
+```lpc
+({
+    "tell", 5,
+    "SourceMUD", "alyx",
+    "TargetMUD", "friend",
+    "Alyx", "Hello"
+})
 ```
 
-**TOTAL FIELDS: 8**
+```lpc
+({
+    "emoteto", 5,
+    "SourceMUD", "alyx",
+    "TargetMUD", "friend",
+    "Alyx", "$N waves."
+})
+```
 
-## WHAT IS VISNAME?
+The gateway's `TellPacket` and `EmotetoPacket` models emit and parse this
+eight-field layout. The local JSON-RPC layer uses `message` for `tell` but
+`emote` for `emoteto`; that local parameter distinction does not alter the
+router packet's final text field.
 
-`visname` is the "visual name" - how the sender wants to be displayed to the recipient. 
-- It defaults to the `originator_user` if not specified
-- It allows for nicknames or display names different from the actual username
-- It is **ALWAYS REQUIRED** in tell and emoteto packets
-- It is **ALWAYS** at position 6 in the packet array
-
-## COMMON MISTAKES TO AVOID
-
-1. **WRONG**: Assuming tell packets have 7 fields
-   **RIGHT**: Tell packets have 8 fields, visname at position 6
-
-2. **WRONG**: Making visname optional
-   **RIGHT**: Visname is REQUIRED, but can default to originator_user
-
-3. **WRONG**: Omitting visname from packet arrays
-   **RIGHT**: Always include visname at position 6
-
-## TEST EXPECTATIONS
-
-All tests MUST expect:
-- Tell packets to have 8 fields
-- Emoteto packets to have 8 fields
-- Visname at position 6
-- Visname to default to originator_user if not explicitly set
-
-## IMPLEMENTATION CHECKLIST
-
-- [ ] TellPacket.to_lpc_array() returns 8 elements
-- [ ] TellPacket.from_lpc_array() expects 8 elements
-- [ ] EmotetoPacket.to_lpc_array() returns 8 elements
-- [ ] EmotetoPacket.from_lpc_array() expects 8 elements
-- [ ] All tell packet tests expect 8 fields
-- [ ] All emoteto packet tests expect 8 fields
-- [ ] Visname validation sets default to originator_user
-
-## REFERENCES
-
-This is based on the actual I3 protocol as implemented by:
-- Dead Souls MUDlib
-- LPUniversity reference implementation
-- FluffOS I3 daemon
-- Nightmare LPMud I3 implementation
-
-**DO NOT DEVIATE FROM THIS SPECIFICATION**
+For the broader packet envelope, see [Packet format](packet-format.md).

@@ -1,5 +1,9 @@
 # OOB Protocols
 
+> Historical protocol reference only. Intermud3 Gateway does not implement an
+> OOB listener, OOB authentication, or mail/news/file handlers and should not
+> advertise those services.
+
 Out-of-band (OOB) protocols handle large data transfers and services that require direct mud-to-mud connections, separate from the main router network.
 
 ## OOB Connection Flow
@@ -37,7 +41,7 @@ Target returns an `oob-begin` packet (with empty authorization) to signal readin
 })
 ```
 
-### Step 6: Data Transfer (Originator → Target)
+### Step 6: Data Transfer (Originator -> Target)
 Originator delivers all queued packets to target. Target responds with replies and acknowledgments during this process. Target is not yet allowed to actively send new packets.
 
 ### Step 7: Originator Completion
@@ -50,7 +54,7 @@ Originator delivers an `oob-end` packet signaling completion:
 })
 ```
 
-### Step 8: Data Transfer (Target → Originator)
+### Step 8: Data Transfer (Target -> Originator)
 If target has packets to deliver in its outbound queue for the originator:
 1. Target performs deliveries
 2. Originator responds with replies and acknowledgments
@@ -141,22 +145,22 @@ OOB packets don't follow standard in-band packet format:
 ## Example: Mail Delivery
 
 ```
-1. MudA → Router → MudB: auth-mud-req
-2. MudB → Router → MudA: auth-mud-reply (key: 12345)
+1. MudA -> Router -> MudB: auth-mud-req
+2. MudB -> Router -> MudA: auth-mud-reply (key: 12345)
 3. MudA connects to MudB:OOB_PORT
-4. MudA → MudB: oob-begin("MudA", 1, 12345)
+4. MudA -> MudB: oob-begin("MudA", 1, 12345)
 5. MudB validates token
-6. MudB → MudA: oob-begin("MudB", 0, 0)
-7. MudA → MudB: mail packet
-8. MudB → MudA: mail-ack
-9. MudA → MudB: oob-end("MudA")
-10. MudB → MudA: oob-end("MudB")
+6. MudB -> MudA: oob-begin("MudB", 0, 0)
+7. MudA -> MudB: mail packet
+8. MudB -> MudA: mail-ack
+9. MudA -> MudB: oob-end("MudA")
+10. MudB -> MudA: oob-end("MudB")
 11. MudA closes connection
 ```
 
 ## Future Considerations
 
-- UDP-based OOB services (currently none defined)
+- UDP-based OOB service families (none are defined by this historical proposal)
 - Encrypted OOB connections
 - Compression for large transfers
 - Streaming protocols for very large files

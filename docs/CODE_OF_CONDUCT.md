@@ -55,7 +55,9 @@ further defined and clarified by project maintainers.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team at admin@example.com. All
+reported privately to the project organization at
+[moshehwebservices@live.com](mailto:moshehwebservices@live.com). Do not put
+sensitive conduct reports in a public GitHub issue. All
 complaints will be reviewed and investigated and will result in a response that
 is deemed necessary and appropriate to the circumstances. The project team is
 obligated to maintain confidentiality with regard to the reporter of an incident.

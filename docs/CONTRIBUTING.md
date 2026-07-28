@@ -1,206 +1,90 @@
-# Contributing to Intermud3
+# Contributing
 
-Thank you for your interest in contributing to the Intermud3 Gateway project! This document provides guidelines for contributing to the Python-based I3 Gateway service that enables MUD-to-Intermud3 network bridging.
+Contributions to Intermud3 Gateway are welcome. The project combines a
+network-facing protocol implementation with two local JSON-RPC transports, so
+changes should be small enough to review and accompanied by evidence at the
+appropriate layer.
 
-## Getting Started
+## Development setup
 
-1. Fork the repository
-2. Clone your fork to your local machine
-3. Create a new branch for your feature or bug fix
-4. Make your changes
-5. Test your changes thoroughly
-6. Commit your changes with clear, descriptive commit messages
-7. Push to your fork
-8. Submit a pull request
+Python 3.12 or newer is required.
 
-## Development Setup
-
-### Prerequisites
-- Python 3.12 or higher (Python 3.14 recommended)
-- pip package manager
-- Git
-- Basic understanding of MUD development and networking protocols
-- Understanding of async/await Python programming
-
-### Setting up Development Environment
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/Intermud3.git
+git clone https://github.com/LuminariMUD/Intermud3.git
 cd Intermud3
-
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Linux/Mac
-# or
-venv\Scripts\activate     # On Windows
-
-# Install development dependencies
-make install-dev
-# or manually:
-pip install -r requirements-dev.txt
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 ```
 
-### Running the Application
+Validate configuration without opening network sockets:
+
 ```bash
-# Run the I3 Gateway
-make run
-# or
-python -m src
-
-# Run in development mode with debug logging
-make dev
+cp .env.example .env
+python -m src --dry-run
 ```
 
-### Running Tests
+The example configuration includes placeholder API credentials. Replace them
+before starting a shared or internet-reachable instance. The primary checked-in
+API entry reads `API_KEY_LUMINARI`; `API_KEY_YOURMUD` in `.env.example` is not
+consumed unless the YAML is changed to reference it.
+
+## Checks
+
+Run focused tests while developing, then the configured gate:
+
 ```bash
-# Run all tests
-make test
-
-# Run unit tests only
-make test-unit
-
-# Run integration tests only
-make test-integration
-
-# Run tests with coverage
-make test-coverage
+python -m pytest tests/regression -q -o addopts=''
+python -m pytest tests/unit tests/services -q -o addopts=''
+pytest
+ruff check src tests
+black --check src tests
+mypy src
 ```
 
-### Code Quality Tools
-```bash
-# Format code
-make format
+`-o addopts=''` deliberately bypasses repository-wide coverage options for a
+focused run. It must not be presented as the full quality gate.
 
-# Run linting
-make lint
+The repository also includes Make targets, but the direct commands above show
+exactly which tool is being invoked. At the time of writing, `.github/ci.yml`
+contains the intended GitHub Actions jobs but is not under
+`.github/workflows/`; do not claim a green hosted-CI run without a link to an
+actual check.
 
-# Run type checking
-make type-check
+## Testing expectations
 
-# Run all quality checks
-make check
-```
+- Codec or framing changes need round-trip, fragmented-input, malformed-input,
+  and size-boundary cases.
+- Packet changes need exact serialized array-shape assertions.
+- Service changes need request, reply, error, and unsupported-peer behavior.
+- API changes need both WebSocket and newline-delimited TCP coverage where the
+  transports differ.
+- Router lifecycle changes need deterministic mock-router tests. Use the
+  designated test router for disruptive live work.
+- A live observation must identify the date, commit, router, command, and
+  redactions. Do not convert it into a timeless benchmark.
 
-## Code Style Guidelines
+The current test inventory and known gate status are recorded in
+[Testing](projects/TESTING.md).
 
-- Follow PEP 8 Python style guidelines
-- Use 4 spaces for indentation (no tabs)
-- Keep lines under 100 characters (configured in Black)
-- Add type hints for all function parameters and return values
-- Use meaningful variable and function names in snake_case
-- Add docstrings for all public functions and classes
-- Follow async/await patterns for asynchronous code
-- Use structured logging with the configured logger
-- Add comments for complex business logic
-- Use dataclasses or Pydantic models for data structures
+## Code and documentation style
 
-## Contribution Process
+- Use type annotations for new Python APIs.
+- Keep async work non-blocking and make ownership of background tasks explicit.
+- Treat router packets and local API input as untrusted.
+- Never commit API keys, router passwords, player credentials, private
+  messages, state snapshots, logs, or packet captures containing them.
+- Update the API reference, service matrix, configuration caveats, and
+  validation matrix when behavior changes.
+- Avoid unsupported adjectives such as "complete," "production-ready," or
+  "battle-tested." State what was exercised and what remains unverified.
 
-### Reporting Bugs
+## Pull requests
 
-Before submitting a bug report:
-- Check if the issue has already been reported
-- Verify the bug exists in the latest version
-- Collect relevant information (error messages, logs, steps to reproduce)
+Explain the problem, the behavior change, the checks run, and any known
+limitations. Keep unrelated cleanup out of the same change. If a test is
+skipped or failing, name it and explain why; a test count without a result is
+not proof.
 
-When reporting bugs, please include:
-- Clear description of the issue
-- Steps to reproduce the problem
-- Expected behavior
-- Actual behavior
-- System information (OS, compiler version, etc.)
-- Relevant logs or error messages
-
-### Suggesting Features
-
-We welcome feature suggestions! Please:
-- Check if the feature has already been requested
-- Provide a clear use case
-- Explain how it benefits the MUD community
-- Consider backward compatibility with existing Intermud3 implementations
-
-### Submitting Pull Requests
-
-1. **Branch Naming**: Use descriptive branch names:
-   - `feature/add-channel-encryption`
-   - `bugfix/fix-memory-leak`
-   - `docs/update-protocol-spec`
-
-2. **Commit Messages**: Write clear commit messages:
-   - Use present tense ("Add feature" not "Added feature")
-   - Keep the first line under 50 characters
-   - Provide detailed description if needed
-
-3. **Pull Request Description**: Include:
-   - Summary of changes
-   - Related issue numbers
-   - Testing performed
-   - Screenshots (if UI changes)
-
-4. **Code Review**: Be responsive to feedback and questions during review
-
-## Testing
-
-- Add unit tests for new functions and classes in `tests/unit/`
-- Add integration tests for service interactions in `tests/integration/`
-- Use pytest fixtures and async test patterns
-- Ensure all existing tests pass before submitting PR
-- Test with different MUD codebases when possible
-- Verify network protocol compatibility with Intermud3 specification
-- Add performance tests for high-throughput scenarios when relevant
-- Mock external dependencies in unit tests
-- Aim for high test coverage (80%+ target)
-
-## Documentation
-
-- Update API documentation in `docs/API_REFERENCE.md` for any API changes
-- Add docstrings following Google or NumPy style
-- Update README.md if adding new features or changing setup instructions
-- Document any new configuration options in `config/config.yaml` and docs
-- Update architecture documentation in `docs/ARCHITECTURE.md` for significant changes
-- Add inline comments for complex business logic
-- Keep documentation current with code changes
-
-## Communication
-
-- Be respectful and constructive in all interactions
-- Ask questions if you're unsure about something
-- Join discussions in issues and pull requests
-- Follow our Code of Conduct
-
-## License
-
-By contributing to this project, you agree that your contributions will be licensed under the same license as the project.
-
-## Project Structure
-
-When contributing, familiarize yourself with the project structure:
-
-```
-src/
-├── api/           # REST/WebSocket API for MUD integration
-├── config/        # Configuration management
-├── models/        # Data models and packet definitions
-├── network/       # Network layer and protocol handling
-├── services/      # I3 service implementations
-├── state/         # State management
-└── utils/         # Utility functions
-
-tests/
-├── unit/          # Unit tests
-├── integration/   # Integration tests
-└── performance/   # Performance benchmarks
-
-docs/              # Project documentation
-config/            # Configuration files
-```
-
-## Recognition
-
-Contributors will be recognized in the project's contributor list and commit history.
-
-## Questions?
-
-If you have questions about contributing, please open an issue with the "question" label.
-
-Thank you for helping improve the Intermud3 Gateway for the MUD community!
+All contributors must follow the [Code of Conduct](CODE_OF_CONDUCT.md).

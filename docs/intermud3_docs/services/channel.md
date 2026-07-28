@@ -1,5 +1,10 @@
 # Service: channel
 
+> Partially implemented. Core channel messages, ordinary emotes, listen state,
+> and chanlist synchronization are handled. Targeted emotes, administration,
+> filtering, and `chan-who` reply behavior are incomplete; see the
+> [service matrix](README.md).
+
 Send strings, emotes, and targeted emotes between muds via channels.
 
 ## Channel Types
@@ -19,7 +24,7 @@ Send strings, emotes, and targeted emotes between muds via channels.
 
 Routers maintain three channel lists:
 1. Unfiltered selective admission channels
-2. Unfiltered selective banning channels  
+2. Unfiltered selective banning channels
 3. Filtered selective admission channels
 
 Note: Filtered selective banning channels are not allowed.

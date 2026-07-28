@@ -14,7 +14,7 @@ Connect to:
 ws://HOST:8080/ws
 ```
 
-Use `wss://` when TLS is terminated by a reverse proxy. The gateway’s built-in
+Use `wss://` when TLS is terminated by a reverse proxy. The gateway's built-in
 listener is plain HTTP/WebSocket.
 
 A WebSocket connection may authenticate with:
@@ -125,12 +125,12 @@ Error:
 | `channel_leave` | `channel` | Unsubscribes locally and sends `channel-listen` off |
 | `channel_list` | none | Returns cached router channels |
 | `channel_who` | `channel` | Sends a query and returns cached membership |
-| `channel_history` | `channel` | Returns local stored history; persistence is not implemented |
+| `channel_history` | `channel` | Placeholder currently returns an empty message list |
 | `who` | `target_mud` | Sends request; answer is `who_reply` event |
 | `finger` | `target_mud`, `target_user` | Sends request; answer is `finger_reply` event |
 | `locate` | `target_user` | Broadcasts request; answers are `locate_reply` events |
 | `mudlist` | none | Returns cached router mudlist |
-| `presence_sync` | `users` | Replaces this MUD’s current local-player snapshot |
+| `presence_sync` | `users` | Replaces this MUD's current local-player snapshot |
 | `ping` | none | Local API round-trip |
 | `status` | none | Router and session status |
 | `stats` | none | Current state counts |
@@ -321,7 +321,7 @@ Optional `filter` members:
 
 ### `presence_sync`
 
-Replaces the authenticated MUD’s complete public online-player snapshot.
+Replaces the authenticated MUD's complete public online-player snapshot.
 Omitting a previously present player marks that player absent.
 
 Constraints:
@@ -331,8 +331,8 @@ Constraints:
 - string values must be printable, trimmed, and within their limits;
 - `level` is an integer from 0 through 1000;
 - `idle` is an integer from 0 through 31,536,000 seconds;
-- `login_time` is a non-negative Unix number or a string of at most 64
-  characters.
+- `login_time` is a Unix number from 0 through 32,503,680,000 or a string of
+  at most 64 characters.
 
 Accepted string fields:
 
@@ -414,17 +414,18 @@ Events are JSON-RPC notifications:
 }
 ```
 
-Implemented event names:
+Current producer status:
 
-| Category | Events |
+| Status | Events |
 |---|---|
-| Communication | `tell_received`, `emoteto_received`, `channel_message`, `channel_emote`, `who_reply`, `finger_reply`, `locate_reply` |
-| Network/system | `mud_online`, `mud_offline`, `error_occurred`, `gateway_reconnected` |
-| Channel/user | `channel_joined`, `channel_left`, `user_joined_channel`, `user_left_channel`, `user_status_changed` |
-| Administrative | `maintenance_scheduled`, `shutdown_warning`, `rate_limit_warning` |
+| Produced from incoming packets | `tell_received`, `emoteto_received`, `channel_message`, `channel_emote`, `who_reply`, `finger_reply`, `locate_reply`, `error_occurred` |
+| Produced on router readiness | `gateway_reconnected` |
+| Helper exists, but no automatic mudlist producer is wired | `mud_online`, `mud_offline` |
+| Enum/subscription vocabulary only; no current producer | `channel_joined`, `channel_left`, `user_status_changed`, `maintenance_scheduled`, `shutdown_warning`, `rate_limit_warning` |
+| Callable helper exists, but no current caller | `user_joined_channel`, `user_left_channel` |
 
-Only events created by an active gateway path will be emitted. The enum also
-serves as a stable vocabulary for future producers.
+Clients may register for future events, but should not depend on vocabulary-only
+names being emitted by the current gateway.
 
 ### Communication payloads
 
@@ -507,4 +508,3 @@ endpoint.
 
 See [Deployment](DEPLOYMENT.md) and [Architecture](ARCHITECTURE.md) for trust
 boundaries and operating guidance.
-

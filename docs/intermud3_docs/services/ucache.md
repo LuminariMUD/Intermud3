@@ -1,5 +1,8 @@
 # Service: ucache
 
+> Protocol reference only. The gateway has no registered ucache service and
+> does not advertise it in its active startup builder.
+
 Cache information about remote users to maintain up-to-date user data across the Intermud network.
 
 ## Purpose

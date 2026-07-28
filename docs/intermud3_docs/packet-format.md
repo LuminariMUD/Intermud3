@@ -1,5 +1,9 @@
 # Packet Format
 
+> Protocol reference. The six-field envelope is implemented, but individual
+> service support is limited to the
+> [gateway service matrix](services/README.md).
+
 ## Basic Structure
 
 Transmissions are LPC arrays with a predefined set of six initial elements:
@@ -19,7 +23,9 @@ Transmissions are LPC arrays with a predefined set of six initial elements:
 ## Field Descriptions
 
 ### type (string)
-Describes the type of the packet. See [Packet Types](reference.md#packet-types) for a complete list.
+Describes the type of the packet. See the [packet catalog](reference.md#packet-types);
+the gateway implements only the subset in the
+[service matrix](services/README.md).
 
 ### ttl (int)
 The packet's Time To Live (TTL). Similar to an IP packet's TTL, it specifies the number of hops left to a packet. This provides a mechanism to handle cases where routers mis-route a packet into an endless loop - eventually it will time out and be removed from the network.
@@ -28,7 +34,7 @@ The packet's Time To Live (TTL). Similar to an IP packet's TTL, it specifies the
 Indicates the mud where the packet originated. If the packet cannot be delivered for some reason, this mud will be notified if possible.
 
 ### originator_username (string)
-Indicates the user that triggered the delivery of the packet. 
+Indicates the user that triggered the delivery of the packet.
 - Use `0` if the mud itself sent the packet (e.g., mail delivery or shutdown notification)
 - Should be in lower-case
 
@@ -36,7 +42,7 @@ Indicates the user that triggered the delivery of the packet.
 Used to route the packet to the appropriate destination mud.
 - Use `0` to indicate broadcast packets
 
-### target_username (string)  
+### target_username (string)
 Used to route the packet to a particular user on a remote mud.
 - May be `0` if the packet is targeted for the mud itself rather than a specific user
 - Should always be in lower-case
@@ -59,7 +65,7 @@ Many packets specify a `visname` - a user's "visible" name. This is the name whi
     5,
     "OriginMud",
     "johndoe",
-    "TargetMud", 
+    "TargetMud",
     "janedoe",
     "JohnDoe",      // visname
     "Hello there!"  // message

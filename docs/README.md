@@ -38,15 +38,15 @@ records and are not current capability statements.
 ## Intermud-3 protocol reference
 
 The [protocol reference index](intermud3_docs/README.md) explains how the
-historical I3v3 proposal relates to deployed behavior and to this gateway’s
+historical I3v3 proposal relates to deployed behavior and to this gateway's
 implemented service matrix. The original proposal is useful but incomplete in
 places; project capability claims come from code and validation evidence, not
 from the proposal alone.
 
 ## Historical records
 
-The files under [`previous_changelogs/`](previous_changelogs/) and
-[`projects/`](projects/) preserve earlier release notes and implementation
+The [historical changelogs](previous_changelogs/README.md) and
+[project records](projects/README.md) preserve earlier release notes and implementation
 plans. Each historical page is labeled accordingly. Dates, estimates, targets,
 and test counts in those records describe what was written at the time; use
 `VALIDATION.md`, `ROADMAP.md`, and the current source tree for present status.
@@ -57,4 +57,3 @@ and test counts in those records describe what was written at the time; use
 - [JavaScript/Node.js client](../clients/javascript/README.md)
 - [Python examples](../clients/examples/README.md)
 - [CircleMUD C reference status](../clients/circlemud/CIRCLEMUD_CLIENT_AUDIT.md)
-

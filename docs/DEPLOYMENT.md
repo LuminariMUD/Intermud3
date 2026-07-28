@@ -66,6 +66,25 @@ preferred.
 
 The checked-in demo/admin values are examples, not deployment credentials.
 
+### Environment-template caveats
+
+`.env.example` contains several legacy names that the current YAML does not
+reference. Environment variables affect settings only where
+`config/config.yaml` contains the matching `${NAME:default}` expression.
+
+| Legacy/template name | Current behavior |
+|---|---|
+| `API_KEY_YOURMUD` | Ignored by the checked-in key entry; use `API_KEY_LUMINARI` or edit YAML |
+| `API_WS_HOST`, `API_WS_PORT` | Ignored; use `API_HOST`, `API_PORT` |
+| `API_TCP_HOST`, `API_TCP_PORT` | Ignored; TCP host/port are literal YAML values until edited |
+| `I3_ROUTER_FALLBACK_HOST`, `I3_ROUTER_FALLBACK_PORT` | Ignored; YAML references `I3_FALLBACK_ROUTER_HOST` and `I3_FALLBACK_ROUTER_PORT` |
+| `MAX_QUEUE_SIZE`, `HEARTBEAT_INTERVAL` | Ignored by the current YAML/runtime path |
+| `CONNECTION_TIMEOUT`, `KEEPALIVE_INTERVAL`, `RECONNECT_DELAY` | Parsed into router settings, but the gateway currently constructs its connection manager with fixed values and a no-op keepalive sender |
+| `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_BURST` | Ignored; edit `api.rate_limits.default` in YAML |
+
+Use `python -m src --dry-run` to validate expansion, but remember that a valid
+unused environment variable is still unused.
+
 ### Router selection
 
 The current default is:
@@ -81,7 +100,7 @@ router:
 
 A first registration sends password zero. The router assigns a credential in
 `startup-reply`; the gateway persists it to
-`STATE_DIRECTORY/router-password` and reuses it on restart. Do not set a
+`<state.directory>/router-password` and reuses it on restart. Do not set a
 different password in the environment after registration unless the router
 operator instructs you to.
 
@@ -178,7 +197,7 @@ sudo systemctl status intermud3
 journalctl -u intermud3 -f
 ```
 
-The repository’s `i3-gateway.service` is a concrete example with
+The repository's `i3-gateway.service` is a concrete example with
 `/home/intermud3/Intermud3` paths. Copying it unchanged is correct only when
 that exact layout exists.
 
@@ -187,7 +206,7 @@ that exact layout exists.
 ### Build
 
 ```bash
-docker build --tag i3-gateway:0.4.4-beta .
+docker build --tag i3-gateway:0.4.6-beta .
 ```
 
 ### Compose gateway service
@@ -210,8 +229,15 @@ The base Compose service:
 
 The gateway serves metrics on its HTTP port at `:8080/metrics`. Its `9090:9090`
 mapping is not a separate gateway metrics listener. The optional Prometheus
-service also uses host port 9090, so remove or change the gateway’s unused 9090
+service also uses host port 9090, so remove or change the gateway's unused 9090
 mapping before enabling the monitoring profile.
+
+The profile is scaffolding rather than a complete monitored deployment:
+`monitoring/prometheus.yml` references Alertmanager, node-exporter, Docker
+daemon metrics, and an alerts directory that the base Compose file does not
+define, while the Grafana provisioning paths mounted by Compose are not
+checked in. Remove those targets or add the corresponding services and
+provisioning before treating the stack as healthy.
 
 The production overlay uses host bind locations under `/var/lib/i3-gateway`
 and `/var/log/i3-gateway`; create them with ownership compatible with container
@@ -220,7 +246,7 @@ UID 1000 before startup.
 ### Container secrets
 
 The provided Compose files use environment variables and a bind-mounted `.env`
-for convenience. For a serious deployment, use the platform’s secret mechanism
+for convenience. For a serious deployment, use the platform's secret mechanism
 or a root-owned environment file and ensure secrets do not appear in images,
 Compose source, or support bundles.
 
@@ -272,11 +298,18 @@ Use:
 - logs for startup replies, list IDs, connection changes, and service errors.
 
 `/health` always reports the local API as healthy when its handler runs. It
-does not replace `/health/ready`.
+does not replace `/health/ready`. Readiness is connection-oriented: it can
+return 200 after router TCP connection but before `startup-reply` and fresh
+list synchronization, so cold-start smoke tests should also inspect startup
+logs or list state.
 
 The current metrics endpoint exposes API WebSocket and active-session gauges.
 Do not configure dashboards for packet/latency series that the endpoint does
 not emit.
+
+The logging schema contains `max_size` and `backup_count`, but the active
+logging setup uses a plain file handler and does not rotate it. Configure
+`logrotate`, journald retention, or the container platform's log policy.
 
 ## State, backup, and recovery
 
@@ -324,8 +357,7 @@ do not currently schedule backups. Use an external backup job.
 - [ ] State directory persistent and mode-restricted
 - [ ] Router password included in protected backup
 - [ ] `/health/ready` used for router-aware monitoring
-- [ ] Logs rotate externally or through the configured handler
+- [ ] External log rotation/retention configured
 - [ ] Firewall allows only required inbound API clients and outbound router TCP
 - [ ] Live command smoke test completed
 - [ ] Restore and rollback procedures exercised
-

@@ -1,6 +1,6 @@
 # MUD integration guide
 
-This guide connects a MUD process to Intermud3 Gateway’s local JSON-RPC API.
+This guide connects a MUD process to Intermud3 Gateway's local JSON-RPC API.
 The gateway owns the upstream router session; the MUD owns player identity,
 permissions, display, and game-loop safety.
 
@@ -13,7 +13,7 @@ Your MUD must:
    inbound who/finger/locate requests;
 3. turn local commands into JSON-RPC calls;
 4. consume asynchronous events without blocking the game loop;
-5. sanitize remote text for the MUD’s display system;
+5. sanitize remote text for the MUD's display system;
 6. reconnect and restore channel subscriptions after a local API disconnect.
 
 The gateway handles:
@@ -84,7 +84,7 @@ or authenticate in the first frame:
 
 ### TCP
 
-Read the server’s `welcome` line, then write:
+Read the server's `welcome` line, then write:
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"api_key":"YOUR_KEY"}}
@@ -105,6 +105,10 @@ Before enabling player commands:
 
 Keep local API connectivity distinct from router readiness. A MUD can be
 connected to port 8081 while the gateway is reconnecting upstream.
+`/health/ready` and `status.connected` report router transport connectivity,
+not completion of startup/list synchronization. After a cold start, wait for
+the startup reply or populated synchronized state before assuming every remote
+operation is available.
 
 ## JSON-RPC request discipline
 
@@ -130,7 +134,7 @@ Server event:
 ## Publish local player presence
 
 Presence allows the gateway to build I3 who/finger/locate replies from your
-game’s authoritative state.
+game's authoritative state.
 
 Send a complete snapshot, not a delta:
 
@@ -447,4 +451,3 @@ Do not fuzz or load-test production routers.
 - [ ] Secrets and private content are redacted from logs
 - [ ] Test-router command matrix passes
 - [ ] Router password/state directory is backed up securely
-

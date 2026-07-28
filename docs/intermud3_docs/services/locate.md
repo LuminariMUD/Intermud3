@@ -1,5 +1,8 @@
 # Service: locate
 
+> Core request/reply packet path implemented. The gateway answers from a fresh
+> local `presence_sync` snapshot and emits remote answers as API events.
+
 Locate a particular user on the Intermud system.
 
 ## Network Type
@@ -83,12 +86,12 @@ Request:
 
 Reply:
 ```lpc
-({ 
-    "locate-reply", 
-    5, 
-    "FoundMud", 
-    0, 
-    "SeekMud", 
+({
+    "locate-reply",
+    5,
+    "FoundMud",
+    0,
+    "SeekMud",
     "finder",
     "FoundMud",
     "LostWizard",

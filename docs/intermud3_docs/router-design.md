@@ -1,5 +1,9 @@
 # Router Design
 
+> Historical router-design reference. This project is a MUD-side gateway, not
+> an I3 router. Exact inter-router topology and conflict policy are controlled
+> by router operators.
+
 ## Overview
 
 Routers form the backbone of the Intermud-3 network, maintaining connectivity between all muds and handling packet routing.
@@ -45,7 +49,7 @@ When two routers generate deltas simultaneously:
 
 1. **Token Ordering**: If tokens t1 and t2 exist where t1 < t2
    - Final token = max(t1, t2)
-   
+
 2. **Receipt Order Issues**:
    - If router receives t1 before t2: Normal operation
    - If router receives t2 before t1: Conflict resolution needed
