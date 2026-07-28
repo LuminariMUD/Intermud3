@@ -246,4 +246,4 @@ The current architecture does not imply:
 - automatic use of every tuning field present in the configuration schema.
 
 Those boundaries keep the documented system aligned with the running code and
-the [roadmap](ROADMAP.md).
+the [roadmap](ongoing-projects/ROADMAP.md).

@@ -48,7 +48,7 @@ are evidence from that run, not permanent size claims.
 | Operations | Health, liveness, readiness, Prometheus-text metrics, structured logs, Docker and systemd assets |
 | Integrations | Python and JavaScript clients/examples plus a CircleMUD-oriented C reference integration |
 
-The release is currently `0.4.6-beta`. "Beta" describes the evolving local API
+The release is currently `0.4.7-beta`. "Beta" describes the evolving local API
 and client packaging; it does not mean the gateway has never spoken to a real
 router. See the [service matrix](docs/intermud3_docs/services/README.md) for
 packet-level scope and [client status](#client-status) for the exact maturity of
@@ -219,7 +219,7 @@ the [deployment guide](docs/DEPLOYMENT.md).
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Performance testing and tuning](docs/PERFORMANCE_TUNING.md)
 - [I3 protocol reference](docs/intermud3_docs/README.md)
-- [Roadmap](docs/ROADMAP.md)
+- [Roadmap](docs/ongoing-projects/ROADMAP.md)
 - [Changelog](docs/CHANGELOG.md)
 
 ## Development

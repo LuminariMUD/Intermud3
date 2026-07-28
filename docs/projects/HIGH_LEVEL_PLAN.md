@@ -25,7 +25,8 @@ MUD client -- JSON-RPC/WebSocket or TCP -- gateway -- I3v3/MudMode -- router
 
 The original week-by-week estimates and achieved throughput/coverage figures
 were planning artifacts, not reproducible evidence, and have been retired.
-Current priorities are maintained in [Roadmap](../ROADMAP.md), while achieved
+Current priorities are maintained in
+[Roadmap](../ongoing-projects/ROADMAP.md), while achieved
 and missing validation is maintained in
 [Validation and interoperability](../VALIDATION.md).
 

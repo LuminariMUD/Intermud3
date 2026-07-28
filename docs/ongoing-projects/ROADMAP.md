@@ -21,7 +21,7 @@ as shipped until its acceptance evidence exists.
   text, and its Alpha classifier with the beta version label, before publishing
   a distribution.
 - Replace the dated failure snapshot in
-  [Testing](projects/TESTING.md) only after the configured `pytest` gate exits
+  [Testing](../projects/TESTING.md) only after the configured `pytest` gate exits
   successfully.
 
 ### Publish the complete live command matrix
@@ -30,7 +30,7 @@ as shipped until its acceptance evidence exists.
   send/receive, who, finger, and locate.
 - Exercise a controlled router disconnect and confirm credential reuse,
   backoff, resubscription, and duplicate-free state.
-- Add the results to [VALIDATION.md](VALIDATION.md).
+- Add the results to [VALIDATION.md](../VALIDATION.md).
 
 ### Harden protocol boundaries
 
@@ -50,6 +50,8 @@ as shipped until its acceptance evidence exists.
 
 ### Operations evidence
 
+- Execute the
+  [production resilience and high-availability plan](PRODUCTION_RESILIENCE_PLAN.md).
 - Publish a sustained soak report with reconnect cycling and representative
   traffic.
 - Validate the Docker Compose monitoring profile as one deployable stack.
@@ -73,5 +75,5 @@ as shipped until its acceptance evidence exists.
 - Source, Docker, systemd, and local-development deployment assets.
 - Live `*i4` registration and list synchronization.
 
-Historical phase plans live in the [project records](projects/README.md). They are retained
-for provenance, not used as the current roadmap.
+Historical phase plans live in the [project records](../projects/README.md).
+They are retained for provenance, not used as the current roadmap.

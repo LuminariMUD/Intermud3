@@ -10,6 +10,6 @@ Current truth is split deliberately:
 - [Validation](../VALIDATION.md) for observed evidence;
 - [Testing](../projects/TESTING.md) for current gate status;
 - [Client status](../../README.md#client-status) for bundled integrations;
-- [Roadmap](../ROADMAP.md) for incomplete work.
+- [Roadmap](../ongoing-projects/ROADMAP.md) for incomplete work.
 
 The original text remains available through Git history.

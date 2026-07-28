@@ -206,7 +206,7 @@ that exact layout exists.
 ### Build
 
 ```bash
-docker build --tag i3-gateway:0.4.6-beta .
+docker build --tag i3-gateway:0.4.7-beta .
 ```
 
 ### Compose gateway service

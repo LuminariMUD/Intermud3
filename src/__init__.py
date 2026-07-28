@@ -1,6 +1,6 @@
 """I3 Gateway - Intermud3 Protocol Gateway Service."""
 
-__version__ = "0.4.6-beta"
+__version__ = "0.4.7-beta"
 __author__ = "I3 Gateway Team"
 __description__ = "A standalone Python service for MUD-to-I3 network bridging"
 

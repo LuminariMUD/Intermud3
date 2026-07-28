@@ -51,7 +51,7 @@ Click's distribution lookup. Use the version in `pyproject.toml` or the
 Before publishing to a package index, correct the placeholder project URLs and
 author address in `pyproject.toml` and reconcile its MIT declaration with the
 repository's Unlicense text. Its `Development Status :: 3 - Alpha` classifier
-also differs from the `0.4.6-beta` version label.
+also differs from the `0.4.7-beta` version label.
 
 ## Source of truth
 

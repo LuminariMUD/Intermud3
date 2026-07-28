@@ -14,4 +14,5 @@ substitutes for the live product documentation.
 
 For current user-facing truth, start with
 [Validation and interoperability](../VALIDATION.md),
-[Roadmap](../ROADMAP.md), and the [documentation index](../README.md).
+[Roadmap](../ongoing-projects/ROADMAP.md), and the
+[documentation index](../README.md).

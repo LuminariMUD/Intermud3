@@ -8,6 +8,16 @@ commits rather than signed release artifacts.
 
 No changes recorded.
 
+## 0.4.7-beta - 2026-07-29
+
+### Documentation
+
+- Moved the active roadmap under `docs/ongoing-projects` and repaired its
+  inbound and relative links.
+- Added a phased production resilience and high-availability plan covering
+  router keepalive, supervision, monitoring, backup/restore, recovery drills,
+  soak testing, and optional active-passive host failover.
+
 ## 0.4.6-beta - 2026-07-28
 
 ### Documentation

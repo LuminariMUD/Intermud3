@@ -32,7 +32,8 @@ records and are not current capability statements.
 |---|---|
 | [Contributing](CONTRIBUTING.md) | Development workflow and review expectations |
 | [Code of Conduct](CODE_OF_CONDUCT.md) | Community standards |
-| [Roadmap](ROADMAP.md) | Prioritized work that is not yet represented as shipped |
+| [Roadmap](ongoing-projects/ROADMAP.md) | Prioritized work that is not yet represented as shipped |
+| [Production resilience plan](ongoing-projects/PRODUCTION_RESILIENCE_PLAN.md) | Self-healing, monitoring, recovery, and optional host-failover work |
 | [Changelog](CHANGELOG.md) | Current release history |
 
 ## Intermud-3 protocol reference
@@ -49,7 +50,8 @@ The [historical changelogs](previous_changelogs/README.md) and
 [project records](projects/README.md) preserve earlier release notes and implementation
 plans. Each historical page is labeled accordingly. Dates, estimates, targets,
 and test counts in those records describe what was written at the time; use
-`VALIDATION.md`, `ROADMAP.md`, and the current source tree for present status.
+`VALIDATION.md`, `ongoing-projects/ROADMAP.md`, and the current source tree for
+present status.
 
 ## Client documentation
 

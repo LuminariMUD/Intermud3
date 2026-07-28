@@ -29,5 +29,6 @@ Phase 4 is active. It is an evidence and completion phase, not a blanket
 - publish a repeatable soak/fault-injection report before making reliability
   or capacity claims.
 
-The maintained priority list is [Roadmap](../ROADMAP.md). The maintained
+The maintained priority list is
+[Roadmap](../ongoing-projects/ROADMAP.md). The maintained
 evidence table is [Validation and interoperability](../VALIDATION.md).
