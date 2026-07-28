@@ -792,6 +792,51 @@ class MudlistPacket(I3Packet):
 
 
 @dataclass
+class ChanlistReplyPacket(I3Packet):
+    """Channel-list update packet from a router."""
+
+    packet_type: PacketType = field(default=PacketType.CHANLIST_REPLY, init=False)
+
+    chanlist_id: int = 0
+    chanlist: dict[str, Any] = field(default_factory=dict)
+
+    def validate(self) -> None:
+        """Validate channel-list packet."""
+        super().validate()
+
+    def to_lpc_array(self) -> list[Any]:
+        """Convert to LPC array."""
+        return [
+            self.packet_type.value,
+            self.ttl,
+            self.originator_mud,
+            self.originator_user,
+            self.target_mud,
+            self.target_user,
+            self.chanlist_id,
+            self.chanlist,
+        ]
+
+    @classmethod
+    def from_lpc_array(cls, data: list[Any]) -> "ChanlistReplyPacket":
+        """Create from LPC array."""
+        if len(data) < 8:
+            raise PacketValidationError(
+                f"Invalid chanlist reply packet: expected 8+ fields, got {len(data)}"
+            )
+
+        return cls(
+            ttl=int(data[1]) if data[1] else 0,
+            originator_mud=str(data[2]) if data[2] else "",
+            originator_user=str(data[3]) if data[3] else "",
+            target_mud=str(data[4]) if data[4] else "",
+            target_user=str(data[5]) if data[5] else "",
+            chanlist_id=int(data[6]) if data[6] else 0,
+            chanlist=data[7] if isinstance(data[7], dict) else {},
+        )
+
+
+@dataclass
 class ErrorPacket(I3Packet):
     """Error packet for protocol errors."""
 
@@ -861,6 +906,7 @@ class PacketFactory:
         PacketType.STARTUP_REQ_3.value: StartupPacket,
         PacketType.STARTUP_REPLY.value: StartupReplyPacket,
         PacketType.MUDLIST.value: MudlistPacket,
+        PacketType.CHANLIST_REPLY.value: ChanlistReplyPacket,
         PacketType.ERROR.value: ErrorPacket,
     }
 

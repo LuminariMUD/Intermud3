@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, Union
 
 from src.utils.logging import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -148,7 +147,7 @@ class JSONRPCProtocol:
             raise ValueError("Reserved method name")
 
         # Validate params (optional)
-        params = data.get("params")
+        params = data.get("params", {})
         if params is not None:
             if not isinstance(params, (dict, list)):
                 raise ValueError("Params must be an object or array")

@@ -7,7 +7,10 @@ channel state, and user sessions.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..network.connection import RouterInfo
 
 
 class MudStatus(Enum):
@@ -69,46 +72,54 @@ class MudInfo:
         Args:
             data: Mudlist entry data array
         """
-        if len(data) < 15:
+        if not isinstance(data, list) or len(data) < 13:
             return
 
+        state = data[0]
+
         # Update connection info
-        if data[0]:  # Address
-            self.address = str(data[0])
-        if data[1]:  # Player port
-            self.player_port = int(data[1])
-        if data[2]:  # TCP port
-            self.tcp_port = int(data[2])
-        if data[3]:  # UDP port
-            self.udp_port = int(data[3])
+        if data[1]:  # Address
+            self.address = str(data[1])
+        if data[2]:  # Player port
+            self.player_port = int(data[2])
+        if data[3]:  # TCP port
+            self.tcp_port = int(data[3])
+        if data[4]:  # UDP port
+            self.udp_port = int(data[4])
 
         # Update MUD characteristics
-        if data[4]:
-            self.mudlib = str(data[4])
         if data[5]:
-            self.base_mudlib = str(data[5])
+            self.mudlib = str(data[5])
         if data[6]:
-            self.driver = str(data[6])
+            self.base_mudlib = str(data[6])
         if data[7]:
-            self.mud_type = str(data[7])
+            self.driver = str(data[7])
         if data[8]:
-            self.open_status = str(data[8])
+            self.mud_type = str(data[8])
         if data[9]:
-            self.admin_email = str(data[9])
+            self.open_status = str(data[9])
+        if data[10]:
+            self.admin_email = str(data[10])
 
         # Update services
-        if data[10] and isinstance(data[10], dict):
-            self.services = data[10]
+        if isinstance(data[11], dict):
+            self.services = data[11]
 
         # Update other data
-        if len(data) > 11 and isinstance(data[11], dict):
-            self.other_data = data[11]
+        if isinstance(data[12], dict):
+            self.other_data = data[12]
 
-        # Update status
-        if data[0] == "0":  # Address "0" means down
-            self.status = MudStatus.DOWN
-        else:
+        # I3 uses -1 for up, 0 for down, and a positive restart delay.
+        if state == -1:
             self.status = MudStatus.UP
+            self.last_startup = datetime.now()
+        elif state == 0:
+            self.status = MudStatus.DOWN
+        elif isinstance(state, int) and state > 0:
+            self.status = MudStatus.REBOOT
+            self.other_data["restart_delay"] = state
+        else:
+            self.status = MudStatus.UNKNOWN
 
         self.last_seen = datetime.now()
 

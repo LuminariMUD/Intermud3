@@ -99,6 +99,7 @@ class TestEventBridge:
                 {
                     "from_mud": "OtherMUD",
                     "from_user": "alice",
+                    "to_mud": "TestMUD",
                     "to_user": "bob",
                     "message": "Hello",
                     "visname": "Alice",
@@ -140,6 +141,7 @@ class TestEventBridge:
                 {
                     "from_mud": "OtherMUD",
                     "from_user": "alice",
+                    "to_mud": "TestMUD",
                     "to_user": "bob",
                     "message": "waves at $N",
                     "visname": "Alice",
@@ -257,6 +259,8 @@ class TestEventBridge:
                     "error_code": "unk-user",
                     "error_message": "Unknown user",
                     "from_mud": "RouterMUD",
+                    "to_mud": "TestMUD",
+                    "to_user": "",
                     "context": "i3_packet_error",
                 },
                 priority=2,

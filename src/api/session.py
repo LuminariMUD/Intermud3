@@ -4,6 +4,7 @@ This module handles client sessions, authentication, rate limiting,
 and message queuing for the API server.
 """
 
+import json
 import time
 import uuid
 from collections import defaultdict, deque
@@ -13,7 +14,6 @@ from typing import Any, Deque, Dict, List, Optional, Set
 
 from src.config.models import APIConfig
 from src.utils.logging import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -129,8 +129,7 @@ class Session:
         if self.websocket:
             return not self.websocket.closed
         if self.tcp_connection:
-            # Check TCP connection status
-            return True  # Simplified for now
+            return not self.tcp_connection.closed
         return False
 
     async def send(self, message: str) -> bool:
@@ -152,10 +151,9 @@ class Session:
                 logger.error(f"Failed to send WebSocket message: {e}")
                 self.queue_message(message)
                 return False
-        elif self.tcp_connection:
-            # Handle TCP send
+        elif self.tcp_connection and not self.tcp_connection.closed:
             try:
-                # Simplified TCP send
+                await self.tcp_connection.send_json(json.loads(message))
                 return True
             except Exception as e:
                 logger.error(f"Failed to send TCP message: {e}")

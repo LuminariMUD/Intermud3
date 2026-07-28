@@ -23,7 +23,6 @@ from src.models.packet import (
 )
 from src.state.manager import StateManager
 
-
 logger = structlog.get_logger(__name__)
 
 
@@ -38,7 +37,9 @@ class APIHandlers:
             state_manager: State manager instance
         """
         self.gateway = gateway
-        self.state_manager = state_manager or StateManager()
+        self.state_manager = (
+            state_manager or getattr(gateway, "state_manager", None) or StateManager()
+        )
 
         # Method registry
         self.methods = {
@@ -300,6 +301,7 @@ class APIHandlers:
 
         # Subscribe session to channel
         subscription_manager.subscribe_channel(session.session_id, channel)
+        session.subscribe(channel)
 
         # Send channel listen packet if not listen-only
         if not listen_only and self.gateway:
@@ -341,6 +343,7 @@ class APIHandlers:
 
         # Unsubscribe session from channel
         subscription_manager.unsubscribe_channel(session.session_id, channel)
+        session.unsubscribe(channel)
 
         # Send channel listen packet to leave
         if self.gateway:
@@ -374,7 +377,16 @@ class APIHandlers:
         filter_opts = params.get("filter", {})
 
         # Get channels from state manager
-        channels = await self.state_manager.get_channels()
+        channel_objects = await self.state_manager.get_channels()
+        channels = [
+            {
+                "name": channel.name,
+                "owner": channel.owner,
+                "type": channel.type,
+                "member_count": sum(len(users) for users in channel.active_users.values()),
+            }
+            for channel in channel_objects
+        ]
 
         # Apply filters if provided
         if filter_opts:
@@ -433,7 +445,12 @@ class APIHandlers:
 
         # For now return cached data if available
         channel_info = await self.state_manager.get_channel(channel)
-        members = channel_info.get("members", []) if channel_info else []
+        members = []
+        if channel_info:
+            members = [
+                {"mud": mud_name, "users": sorted(users)}
+                for mud_name, users in channel_info.active_users.items()
+            ]
 
         return {"status": "success", "channel": channel, "members": members}
 
@@ -478,28 +495,28 @@ class APIHandlers:
         """
         target_mud = params.get("target_mud")
         filters = params.get("filters", {})
+        from_user = params.get("from_user", "*")
 
         if not target_mud:
             raise ValueError("Missing required parameter: target_mud")
 
         # Send who request
-        if self.gateway:
-            packet = WhoPacket(
-                packet_type=PacketType.WHO_REQ,
-                ttl=5,
-                originator_mud=session.mud_name,
-                originator_user="*",
-                target_mud=target_mud,
-                target_user="*",
-                filter_criteria=filters,
-            )
-            await self.gateway.send_packet(packet)
+        if not self.gateway:
+            return {"status": "unavailable", "message": "Gateway not connected"}
 
-        # Return cached data if available
-        who_data = await self.state_manager.get_who_data(target_mud)
-        users = who_data.get("users", []) if who_data else []
+        packet = WhoPacket(
+            packet_type=PacketType.WHO_REQ,
+            ttl=5,
+            originator_mud=session.mud_name,
+            originator_user=from_user,
+            target_mud=target_mud,
+            target_user="*",
+            filter_criteria=filters,
+        )
+        if not await self.gateway.send_packet(packet):
+            return {"status": "failed", "message": f"Could not query {target_mud}"}
 
-        return {"status": "success", "mud_name": target_mud, "users": users, "count": len(users)}
+        return {"status": "requested", "mud_name": target_mud}
 
     async def handle_finger(self, session: Session, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get detailed information about a user.
@@ -513,27 +530,35 @@ class APIHandlers:
         """
         target_mud = params.get("target_mud")
         target_user = params.get("target_user")
+        from_user = params.get("from_user", "*")
 
         if not all([target_mud, target_user]):
             raise ValueError("Missing required parameters: target_mud, target_user")
 
         # Send finger request
-        if self.gateway:
-            packet = FingerPacket(
-                packet_type=PacketType.FINGER_REQ,
-                ttl=5,
-                originator_mud=session.mud_name,
-                originator_user="*",
-                target_mud=target_mud,
-                target_user="*",
-                username=target_user,
-            )
-            await self.gateway.send_packet(packet)
+        if not self.gateway:
+            return {"status": "unavailable", "message": "Gateway not connected"}
 
-        # Return cached data if available
-        finger_data = await self.state_manager.get_finger_data(target_mud, target_user)
+        packet = FingerPacket(
+            packet_type=PacketType.FINGER_REQ,
+            ttl=5,
+            originator_mud=session.mud_name,
+            originator_user=from_user,
+            target_mud=target_mud,
+            target_user="*",
+            username=target_user,
+        )
+        if not await self.gateway.send_packet(packet):
+            return {
+                "status": "failed",
+                "message": f"Could not query {target_user}@{target_mud}",
+            }
 
-        return {"status": "success", "user_info": finger_data or {}}
+        return {
+            "status": "requested",
+            "mud_name": target_mud,
+            "user_name": target_user,
+        }
 
     async def handle_locate(self, session: Session, params: Dict[str, Any]) -> Dict[str, Any]:
         """Find a user on the network.
@@ -546,34 +571,28 @@ class APIHandlers:
             {status, user_name, locations[], found, count}
         """
         target_user = params.get("target_user")
+        from_user = params.get("from_user", "*")
 
         if not target_user:
             raise ValueError("Missing required parameter: target_user")
 
         # Send locate request
-        if self.gateway:
-            packet = LocatePacket(
-                packet_type=PacketType.LOCATE_REQ,
-                ttl=5,
-                originator_mud=session.mud_name,
-                originator_user="*",
-                target_mud="*",
-                target_user="*",
-                user_to_locate=target_user,
-            )
-            await self.gateway.send_packet(packet)
+        if not self.gateway:
+            return {"status": "unavailable", "message": "Gateway not connected"}
 
-        # Return cached data if available
-        locate_data = await self.state_manager.get_locate_data(target_user)
-        locations = locate_data.get("locations", []) if locate_data else []
+        packet = LocatePacket(
+            packet_type=PacketType.LOCATE_REQ,
+            ttl=5,
+            originator_mud=session.mud_name,
+            originator_user=from_user,
+            target_mud="",
+            target_user="",
+            user_to_locate=target_user,
+        )
+        if not await self.gateway.send_packet(packet):
+            return {"status": "failed", "message": f"Could not locate {target_user}"}
 
-        return {
-            "status": "success",
-            "user_name": target_user,
-            "locations": locations,
-            "found": len(locations) > 0,
-            "count": len(locations),
-        }
+        return {"status": "requested", "user_name": target_user}
 
     async def handle_mudlist(self, session: Session, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get list of MUDs on the network.

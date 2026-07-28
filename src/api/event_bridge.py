@@ -11,12 +11,14 @@ from src.models.packet import (
     ChannelPacket,
     EmotetoPacket,
     ErrorPacket,
+    FingerPacket,
     I3Packet,
+    LocatePacket,
     PacketType,
     TellPacket,
+    WhoPacket,
 )
 from src.utils.logging import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -62,6 +64,12 @@ class EventBridge:
                 await self._process_channel_emote(packet)
             elif packet.packet_type == PacketType.ERROR:
                 await self._process_error(packet)
+            elif packet.packet_type == PacketType.WHO_REPLY:
+                await self._process_who_reply(packet)
+            elif packet.packet_type == PacketType.FINGER_REPLY:
+                await self._process_finger_reply(packet)
+            elif packet.packet_type == PacketType.LOCATE_REPLY:
+                await self._process_locate_reply(packet)
             elif packet.packet_type == PacketType.MUDLIST:
                 await self._process_mudlist_update(packet)
             # Add more packet types as needed
@@ -79,6 +87,7 @@ class EventBridge:
         event_data = {
             "from_mud": packet.originator_mud,
             "from_user": packet.originator_user,
+            "to_mud": packet.target_mud,
             "to_user": packet.target_user,
             "message": packet.message,
             "visname": getattr(packet, "visname", packet.originator_user),
@@ -105,6 +114,7 @@ class EventBridge:
         event_data = {
             "from_mud": packet.originator_mud,
             "from_user": packet.originator_user,
+            "to_mud": packet.target_mud,
             "to_user": packet.target_user,
             "message": packet.message,
             "visname": getattr(packet, "visname", packet.originator_user),
@@ -178,6 +188,8 @@ class EventBridge:
             "error_code": packet.error_code,
             "error_message": packet.error_message,
             "from_mud": packet.originator_mud,
+            "to_mud": packet.target_mud,
+            "to_user": packet.target_user,
             "context": "i3_packet_error",
         }
 
@@ -192,6 +204,49 @@ class EventBridge:
         self.stats["events_generated"] += 1
 
         logger.debug(f"Generated error_occurred event: {packet.error_code}")
+
+    async def _process_who_reply(self, packet: WhoPacket):
+        """Forward a remote who reply to the requesting MUD session."""
+        event_data = {
+            "from_mud": packet.originator_mud,
+            "to_mud": packet.target_mud,
+            "to_user": packet.target_user,
+            "users": packet.who_data or [],
+        }
+        event = event_dispatcher.create_event(EventType.WHO_REPLY, event_data, priority=4, ttl=60)
+        await event_dispatcher.dispatch(event)
+        self.stats["events_generated"] += 1
+
+    async def _process_finger_reply(self, packet: FingerPacket):
+        """Forward a remote finger reply to the requesting MUD session."""
+        event_data = {
+            "from_mud": packet.originator_mud,
+            "to_mud": packet.target_mud,
+            "to_user": packet.target_user,
+            "user_info": packet.user_info or {},
+        }
+        event = event_dispatcher.create_event(
+            EventType.FINGER_REPLY, event_data, priority=4, ttl=60
+        )
+        await event_dispatcher.dispatch(event)
+        self.stats["events_generated"] += 1
+
+    async def _process_locate_reply(self, packet: LocatePacket):
+        """Forward a remote locate reply to the requesting MUD session."""
+        event_data = {
+            "from_mud": packet.originator_mud,
+            "to_mud": packet.target_mud,
+            "to_user": packet.target_user,
+            "located_mud": packet.located_mud,
+            "located_user": packet.located_user,
+            "idle": packet.idle_time,
+            "status": packet.status_string,
+        }
+        event = event_dispatcher.create_event(
+            EventType.LOCATE_REPLY, event_data, priority=4, ttl=60
+        )
+        await event_dispatcher.dispatch(event)
+        self.stats["events_generated"] += 1
 
     async def _process_mudlist_update(self, packet):
         """Process mudlist update and generate events for mud status changes.

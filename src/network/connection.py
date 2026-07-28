@@ -121,6 +121,7 @@ class ConnectionManager:
         if self.state != ConnectionState.DISCONNECTED:
             return False
 
+        self._closing = False
         await self._set_state(ConnectionState.CONNECTING)
 
         # Try routers in priority order
@@ -191,7 +192,6 @@ class ConnectionManager:
             self.transport = None
 
         await self._set_state(ConnectionState.DISCONNECTED)
-        self._closing = False
 
     async def send_message(self, data: Any) -> bool:
         """Send a message through the current connection.

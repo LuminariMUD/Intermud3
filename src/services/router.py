@@ -130,7 +130,7 @@ class RouterService(BaseService):
             return False
 
         # Check if MUD is online
-        if mud_info.status != "online":
+        if not mud_info.is_online():
             self.logger.warning(
                 "Target MUD is offline", target_mud=packet.target_mud, status=mud_info.status
             )

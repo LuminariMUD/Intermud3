@@ -9,7 +9,6 @@ import click
 import structlog
 from dotenv import load_dotenv
 
-
 # Add parent directory to path if running as module
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -18,8 +17,13 @@ from src.config import load_config
 from src.gateway import I3Gateway
 from src.utils.logging import setup_logging
 
-
 logger = structlog.get_logger()
+
+
+async def shutdown_gateway(gateway: I3Gateway) -> None:
+    """Shut the gateway down, then stop its owning event loop."""
+    await gateway.shutdown()
+    asyncio.get_running_loop().stop()
 
 
 def handle_signal(sig: int, gateway: I3Gateway | None) -> None:
@@ -27,7 +31,7 @@ def handle_signal(sig: int, gateway: I3Gateway | None) -> None:
     sig_name = signal.Signals(sig).name
     logger.info(f"Received {sig_name}, shutting down...")
     if gateway:
-        asyncio.create_task(gateway.shutdown())
+        asyncio.create_task(shutdown_gateway(gateway))
 
 
 @click.command()
@@ -121,7 +125,7 @@ def main(config: Path, env_file: Path, debug: bool, log_level: str | None, dry_r
         logger.exception("Fatal error", error=str(e))
         sys.exit(1)
     finally:
-        if gateway and loop:
+        if gateway and loop and not gateway._shutdown_event.is_set():
             loop.run_until_complete(gateway.shutdown())
         if loop:
             loop.close()

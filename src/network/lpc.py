@@ -123,8 +123,11 @@ class LPCDecoder:
 
         try:
             self._text = data.decode("utf-8")
-        except UnicodeDecodeError as e:
-            raise LPCError(f"Invalid UTF-8 in LPC data: {e}")
+        except UnicodeDecodeError:
+            # I3 predates UTF-8 and some legacy MUDs still send arbitrary
+            # single-byte characters in LPC strings. Latin-1 preserves those
+            # bytes losslessly instead of dropping the entire network packet.
+            self._text = data.decode("latin-1")
 
         self._pos = 0
         result = self._decode_value()
@@ -165,9 +168,9 @@ class LPCDecoder:
 
         if ch == '"':
             return self._decode_string()
-        elif ch == '(':
+        elif ch == "(":
             return self._decode_compound()
-        elif ch == '-' or ch.isdigit():
+        elif ch == "-" or ch.isdigit():
             return self._decode_number()
         else:
             raise LPCError(f"Unexpected character: {ch!r} at position {self._pos}")
@@ -182,53 +185,53 @@ class LPCDecoder:
             ch = self._advance()
             if ch == '"':
                 break
-            elif ch == '\\':
+            elif ch == "\\":
                 # Escape sequence
                 next_ch = self._advance()
                 if next_ch == '"':
                     result.append('"')
-                elif next_ch == '\\':
-                    result.append('\\')
-                elif next_ch == 'n':
-                    result.append('\n')
-                elif next_ch == 't':
-                    result.append('\t')
-                elif next_ch == 'r':
-                    result.append('\r')
+                elif next_ch == "\\":
+                    result.append("\\")
+                elif next_ch == "n":
+                    result.append("\n")
+                elif next_ch == "t":
+                    result.append("\t")
+                elif next_ch == "r":
+                    result.append("\r")
                 else:
                     result.append(next_ch)
             else:
                 result.append(ch)
 
-        return ''.join(result)
+        return "".join(result)
 
     def _decode_number(self) -> int | float:
         """Decode a number (integer or float)."""
         start = self._pos
 
         # Handle negative
-        if self._peek() == '-':
+        if self._peek() == "-":
             self._advance()
 
         # Read digits
-        while self._peek() and (self._peek().isdigit() or self._peek() == '.'):
+        while self._peek() and (self._peek().isdigit() or self._peek() == "."):
             self._advance()
 
-        num_str = self._text[start:self._pos]
+        num_str = self._text[start : self._pos]
 
-        if '.' in num_str:
+        if "." in num_str:
             return float(num_str)
         return int(num_str)
 
     def _decode_compound(self) -> list | dict:
         """Decode an array or mapping."""
-        if self._advance() != '(':
+        if self._advance() != "(":
             raise LPCError("Expected '('")
 
         ch = self._advance()
-        if ch == '{':
+        if ch == "{":
             return self._decode_array()
-        elif ch == '[':
+        elif ch == "[":
             return self._decode_mapping()
         else:
             raise LPCError(f"Expected '{{' or '[' after '(', got {ch!r}")
@@ -241,10 +244,10 @@ class LPCDecoder:
             self._skip_whitespace()
             ch = self._peek()
 
-            if ch == ',':
+            if ch == ",":
                 self._advance()
                 continue
-            elif ch == '}':
+            elif ch == "}":
                 self._advance()
                 break
             else:
@@ -252,7 +255,7 @@ class LPCDecoder:
 
         # Consume closing )
         self._skip_whitespace()
-        if self._peek() == ')':
+        if self._peek() == ")":
             self._advance()
 
         return result
@@ -265,23 +268,23 @@ class LPCDecoder:
             self._skip_whitespace()
             ch = self._peek()
 
-            if ch == ',':
+            if ch == ",":
                 self._advance()
                 continue
-            elif ch == ']':
+            elif ch == "]":
                 self._advance()
                 break
             else:
                 key = self._decode_value()
                 self._skip_whitespace()
-                if self._peek() == ':':
+                if self._peek() == ":":
                     self._advance()
                 value = self._decode_value()
                 result[key] = value
 
         # Consume closing )
         self._skip_whitespace()
-        if self._peek() == ')':
+        if self._peek() == ")":
             self._advance()
 
         return result

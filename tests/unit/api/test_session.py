@@ -93,6 +93,7 @@ class TestSession:
     def test_session_with_tcp(self):
         """Test session with TCP connection."""
         mock_connection = MagicMock()
+        mock_connection.closed = False
 
         now = datetime.utcnow()
         session_data = {
@@ -216,8 +217,8 @@ class TestSession:
     async def test_send_via_tcp(self):
         """Test sending message via TCP."""
         mock_connection = MagicMock()
-        mock_connection.write = MagicMock()
-        mock_connection.drain = AsyncMock()
+        mock_connection.closed = False
+        mock_connection.send_json = AsyncMock()
 
         now = datetime.utcnow()
         session_data = {
@@ -232,10 +233,13 @@ class TestSession:
         session = Session(**session_data)
         session.tcp_connection = mock_connection
 
-        result = await session.send("test message")
+        message = '{"jsonrpc":"2.0","method":"test","params":{}}'
+        result = await session.send(message)
 
         assert result is True
-        # The TCP send implementation is simplified and doesn't call write/drain yet
+        mock_connection.send_json.assert_awaited_once_with(
+            {"jsonrpc": "2.0", "method": "test", "params": {}}
+        )
 
     @pytest.mark.asyncio
     async def test_send_when_disconnected(self):

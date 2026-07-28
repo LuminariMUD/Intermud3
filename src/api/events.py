@@ -13,7 +13,6 @@ from typing import Any, Callable, Dict, List, Optional, Set
 from src.api.session import Session
 from src.utils.logging import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -25,6 +24,9 @@ class EventType(Enum):
     EMOTETO_RECEIVED = "emoteto_received"
     CHANNEL_MESSAGE = "channel_message"
     CHANNEL_EMOTE = "channel_emote"
+    WHO_REPLY = "who_reply"
+    FINGER_REPLY = "finger_reply"
+    LOCATE_REPLY = "locate_reply"
 
     # System Events
     MUD_ONLINE = "mud_online"
@@ -222,6 +224,11 @@ class EventDispatcher:
         if not session.is_connected():
             return False
 
+        # Point-to-point events are visible only to their target MUD.
+        target_mud = event.data.get("to_mud")
+        if target_mud and target_mud != session.mud_name:
+            return False
+
         # Check permissions for event type
         if not self._check_permissions(session, event):
             return False
@@ -255,6 +262,9 @@ class EventDispatcher:
             EventType.EMOTETO_RECEIVED: "tell",
             EventType.CHANNEL_MESSAGE: "channel",
             EventType.CHANNEL_EMOTE: "channel",
+            EventType.WHO_REPLY: "info",
+            EventType.FINGER_REPLY: "info",
+            EventType.LOCATE_REPLY: "info",
             EventType.MUD_ONLINE: "info",
             EventType.MUD_OFFLINE: "info",
             EventType.CHANNEL_JOINED: "channel",

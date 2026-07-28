@@ -26,7 +26,10 @@ class I3Gateway:
         self._shutdown_event = asyncio.Event()
 
         # Initialize components
-        self.state_manager = StateManager(persistence_dir=Path("data"), cache_ttl=300.0)
+        self.state_manager = StateManager(
+            persistence_dir=Path(settings.state.directory),
+            cache_ttl=300.0,
+        )
 
         self.service_manager = ServiceManager(self.state_manager)
 
@@ -108,6 +111,9 @@ class I3Gateway:
 
     async def shutdown(self) -> None:
         """Shutdown the I3 Gateway service."""
+        if self._shutdown_event.is_set():
+            return
+
         self.logger.info("Shutting down I3 Gateway...")
         self.running = False
 
@@ -268,10 +274,12 @@ class I3Gateway:
 
         # Send startup packet
         lpc_array = startup.to_lpc_array()
-        self.logger.debug("Startup packet LPC array",
-                          router_name=router_name,
-                          packet_fields=len(lpc_array),
-                          lpc_data=str(lpc_array))
+        self.logger.debug(
+            "Startup packet LPC array",
+            router_name=router_name,
+            packet_fields=len(lpc_array),
+            lpc_data=str(lpc_array),
+        )
         await self.send_packet(startup)
         self.logger.info("Sent startup packet", mud_name=self.settings.mud.name)
 
@@ -285,6 +293,8 @@ class I3Gateway:
                 # Handle special router packets first
                 if packet.packet_type == PacketType.MUDLIST:
                     await self._handle_mudlist(packet)
+                elif packet.packet_type == PacketType.CHANLIST_REPLY:
+                    await self._handle_chanlist(packet)
                 elif packet.packet_type == PacketType.STARTUP_REPLY:
                     await self._handle_startup_reply(packet)
                 elif packet.packet_type == PacketType.ERROR:
@@ -321,6 +331,14 @@ class I3Gateway:
         if isinstance(packet, MudlistPacket):
             await self.state_manager.update_mudlist(packet.mudlist, packet.mudlist_id)
             self.logger.info("Updated mudlist", mudlist_id=packet.mudlist_id)
+
+    async def _handle_chanlist(self, packet: Any):
+        """Handle a channel-list update from the router."""
+        from .models.packet import ChanlistReplyPacket
+
+        if isinstance(packet, ChanlistReplyPacket):
+            await self.state_manager.update_chanlist(packet.chanlist, packet.chanlist_id)
+            self.logger.info("Updated chanlist", chanlist_id=packet.chanlist_id)
 
     async def _handle_startup_reply(self, packet: Any):
         """Handle startup reply from router."""

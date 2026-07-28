@@ -9,11 +9,12 @@ import json
 from typing import Dict, Optional, Set
 
 from src.api.api_handlers import APIHandlers
+from src.api.events import event_dispatcher
 from src.api.protocol import JSONRPCError, JSONRPCProtocol
 from src.api.session import Session, SessionManager
+from src.api.subscriptions import subscription_manager
 from src.config.models import APIConfig
 from src.utils.logging import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -83,8 +84,8 @@ class TCPConnection:
                         # Connection closed
                         break
 
-                    # Log raw data for debugging
-                    logger.debug(f"Raw data from {self.remote_address}: {data[:100]}")
+                    # Authentication requests contain credentials, so never log payload bytes.
+                    logger.debug(f"Received {len(data)} bytes from {self.remote_address}")
 
                     # Add to buffer
                     self.buffer += data.decode("utf-8", errors="ignore")
@@ -124,6 +125,7 @@ class TCPConnection:
                     try:
                         self.session = await self.session_manager.authenticate(api_key)
                         self.session.tcp_connection = self
+                        event_dispatcher.register_session(self.session)
 
                         # Send success response
                         response = self.protocol.format_response(
@@ -245,6 +247,8 @@ class TCPConnection:
         try:
             # Clean up session
             if self.session:
+                event_dispatcher.unregister_session(self.session.session_id)
+                subscription_manager.cleanup_session(self.session.session_id)
                 self.session.tcp_connection = None
                 await self.session_manager.disconnect(self.session)
 

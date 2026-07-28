@@ -144,7 +144,7 @@ class StateManager:
         if self.persistence_dir:
             await self.save_state()
 
-    async def update_mudlist(self, mudlist_data: dict[str, list[Any]], mudlist_id: int):
+    async def update_mudlist(self, mudlist_data: dict[str, Any], mudlist_id: int):
         """Update the MUD list from router data.
 
         Args:
@@ -154,19 +154,24 @@ class StateManager:
         async with self.mudlist_lock:
             self.mudlist_id = mudlist_id
 
-            # Update existing MUDs and add new ones
+            # Mudlist packets are incremental. A value of 0 deletes a MUD;
+            # entries absent from this packet retain their previous state.
             for mud_name, mud_data in mudlist_data.items():
+                if mud_data == 0:
+                    self.mudlist.pop(mud_name, None)
+                    await self.cache.delete(f"mud:{mud_name}")
+                    continue
+
+                if not isinstance(mud_data, list) or len(mud_data) < 13:
+                    continue
+
                 if mud_name in self.mudlist:
                     self.mudlist[mud_name].update_from_mudlist(mud_data)
                 else:
                     mud_info = MudInfo(name=mud_name, address="", player_port=0)
                     mud_info.update_from_mudlist(mud_data)
                     self.mudlist[mud_name] = mud_info
-
-            # Mark MUDs not in update as down
-            for mud_name in self.mudlist:
-                if mud_name not in mudlist_data:
-                    self.mudlist[mud_name].status = MudStatus.DOWN
+                await self.cache.delete(f"mud:{mud_name}")
 
     async def get_mud_info(self, mud_name: str) -> MudInfo | None:
         """Get information about a specific MUD.
@@ -239,21 +244,33 @@ class StateManager:
         async with self.channel_lock:
             self.chanlist_id = chanlist_id
 
-            # Update channels
+            # Chanlist packets are incremental. A value of 0 deletes a
+            # channel; the protocol's normal entry is [owner_mud, type].
             for channel_name, channel_data in chanlist_data.items():
+                if channel_data == 0:
+                    self.channels.pop(channel_name, None)
+                    continue
+
+                if isinstance(channel_data, list):
+                    owner = str(channel_data[0]) if channel_data and channel_data[0] else ""
+                    channel_type = (
+                        int(channel_data[1]) if len(channel_data) > 1 and channel_data[1] else 0
+                    )
+                elif isinstance(channel_data, dict):
+                    owner = str(channel_data.get("owner", ""))
+                    channel_type = int(channel_data.get("type", 0))
+                else:
+                    continue
+
                 if channel_name not in self.channels:
-                    # Create new channel info
                     self.channels[channel_name] = ChannelInfo(
                         name=channel_name,
-                        owner=(
-                            channel_data.get("owner", "") if isinstance(channel_data, dict) else ""
-                        ),
-                        type=channel_data.get("type", 0) if isinstance(channel_data, dict) else 0,
+                        owner=owner,
+                        type=channel_type,
                     )
-                # Update existing channel
-                elif isinstance(channel_data, dict):
-                    self.channels[channel_name].owner = channel_data.get("owner", "")
-                    self.channels[channel_name].type = channel_data.get("type", 0)
+                else:
+                    self.channels[channel_name].owner = owner
+                    self.channels[channel_name].type = channel_type
 
     async def get_mud(self, mud_name: str) -> MudInfo | None:
         """Get information about a specific MUD (alias for get_mud_info).
@@ -450,11 +467,14 @@ class StateManager:
             return [
                 {
                     "name": mud.name,
-                    "host": mud.host,
-                    "port": mud.port,
+                    "host": mud.address,
+                    "port": mud.player_port,
+                    "tcp_port": mud.tcp_port,
+                    "udp_port": mud.udp_port,
                     "driver": mud.driver,
                     "mudlib": mud.mudlib,
-                    "status": mud.status,
+                    "mud_type": mud.mud_type,
+                    "status": mud.status.value,
                     "services": mud.services,
                     "open_status": mud.open_status,
                     "admin_email": mud.admin_email,
@@ -524,7 +544,7 @@ class StateManager:
         """
         async with self.mudlist_lock:
             mud_count = len(self.mudlist)
-            online_muds = sum(1 for mud in self.mudlist.values() if mud.status == 0)
+            online_muds = sum(1 for mud in self.mudlist.values() if mud.status == MudStatus.UP)
 
         async with self.channel_lock:
             channel_count = len(self.channels)
