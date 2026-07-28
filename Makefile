@@ -107,8 +107,8 @@ pre-commit-update: ## Update pre-commit hooks
 security: ## Run security checks
 	@echo "$(YELLOW)Running Bandit security scan...$(NC)"
 	$(BANDIT) -r src/ -ll
-	@echo "$(YELLOW)Running Safety check...$(NC)"
-	-safety check
+	@echo "$(YELLOW)Running Safety scan...$(NC)"
+	-safety scan
 	@echo "$(YELLOW)Running pip-audit...$(NC)"
 	-pip-audit
 	@echo "$(GREEN)Security checks complete!$(NC)"

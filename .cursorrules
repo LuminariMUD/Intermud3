@@ -93,7 +93,7 @@ from src.services.base import BaseService
 ### Environment-Specific Notes
 - The project runs in Docker containers for production
 - Support both development (live reload) and production configurations
-- Ensure compatibility with Python 3.9+ as specified in `pyproject.toml`
+- Ensure compatibility with Python 3.12+ as specified in `pyproject.toml`
 - Test code works properly in both WSL2 and native Linux environments
 
 ### Git Workflow

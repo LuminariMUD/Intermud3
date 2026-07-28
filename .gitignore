@@ -112,6 +112,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# Node.js dependencies and logs
+node_modules/
+npm-debug.log*
+
 # Spyder project settings
 .spyderproject
 .spyproject

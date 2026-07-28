@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -23,38 +23,37 @@ repos:
       - id: destroyed-symlinks
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.16.0
     hooks:
-      - id: ruff
+      - id: ruff-check
         name: "Ruff linter"
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
         name: "Ruff formatter"
 
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 26.5.1
     hooks:
       - id: black
         name: "Format Python code with Black"
-        language_version: python3.9
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v2.3.0
     hooks:
       - id: mypy
         name: "Type check with MyPy"
         additional_dependencies:
-          - types-pyyaml>=6.0
-          - types-setuptools
-          - pydantic>=2.0
-          - aiohttp>=3.9.0
-          - structlog>=23.0
-          - click>=8.0
+          - types-pyyaml>=6.0.12.20260724
+          - types-setuptools>=83.0.0.20260724
+          - pydantic>=2.13.4
+          - aiohttp>=3.14.3
+          - structlog>=26.1.0
+          - click>=8.4.2
         args: [--ignore-missing-imports, --strict, --show-error-codes]
         exclude: ^tests/
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.10
+    rev: 1.9.4
     hooks:
       - id: bandit
         name: "Security check with Bandit"
@@ -62,37 +61,37 @@ repos:
         exclude: ^tests/
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.29.1
+    rev: v4.16.5
     hooks:
       - id: commitizen
         name: "Check commit message format"
       - id: commitizen-branch
         name: "Check branch naming convention"
-        stages: [push]
+        stages: [pre-push]
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 8.0.1
     hooks:
       - id: isort
         name: "Sort imports with isort"
         args: ["--profile", "black", "--line-length", "100"]
 
   - repo: https://github.com/python-poetry/poetry
-    rev: 1.8.4
+    rev: 2.4.1
     hooks:
       - id: poetry-check
         name: "Validate pyproject.toml"
         files: pyproject.toml
 
-  - repo: https://github.com/charliermarsh/docformatter
-    rev: v1.7.5
+  - repo: https://github.com/PyCQA/docformatter
+    rev: v1.7.8
     hooks:
       - id: docformatter
         name: "Format docstrings"
         args: [--in-place, --wrap-summaries, "100", --wrap-descriptions, "100"]
 
 default_language_version:
-  python: python3.9
+  python: python3
 
 exclude: |
   (?x)^(

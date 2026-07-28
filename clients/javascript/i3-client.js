@@ -19,8 +19,10 @@ let WebSocket;
 if (isNode) {
     try {
         WebSocket = require('ws');
-    } catch (e) {
-        throw new Error('WebSocket library not found. Please install: npm install ws');
+    } catch (error) {
+        throw new Error('WebSocket library not found. Please install: npm install ws', {
+            cause: error
+        });
     }
 } else if (isBrowser) {
     WebSocket = window.WebSocket || window.MozWebSocket;

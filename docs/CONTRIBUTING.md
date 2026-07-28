@@ -16,7 +16,7 @@ Thank you for your interest in contributing to the Intermud3 Gateway project! Th
 ## Development Setup
 
 ### Prerequisites
-- Python 3.9 or higher (Python 3.12 recommended)
+- Python 3.12 or higher (Python 3.14 recommended)
 - pip package manager
 - Git
 - Basic understanding of MUD development and networking protocols

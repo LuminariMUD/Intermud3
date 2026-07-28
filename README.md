@@ -4,8 +4,8 @@
 
 https://github.com/LuminariMUD/Intermud3
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE.md)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![Code Style](https://img.shields.io/badge/Code%20Style-Black-black.svg?style=for-the-badge)](https://github.com/psf/black)
 [![Pre-commit](https://img.shields.io/badge/Pre--commit-Enabled-brightgreen?style=for-the-badge&logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
@@ -117,7 +117,7 @@ https://github.com/LuminariMUD/Intermud3
 <table>
 <tr>
 <td align="center">🐍</td>
-<td><strong>Python 3.9+</strong></td>
+<td><strong>Python 3.12+</strong></td>
 <td>Latest Python runtime</td>
 </tr>
 <tr>
@@ -427,7 +427,7 @@ i3_send_tell("player", "OtherMUD", "friend", "Hello from CircleMUD!");
 
 <div align="center">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 **Open Source • Free Forever • MIT Licensed**
 

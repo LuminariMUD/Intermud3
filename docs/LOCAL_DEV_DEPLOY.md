@@ -16,13 +16,13 @@ The gateway loads `.env` by default. The `.env.local` pattern is a convention su
 
 Before starting, ensure you have:
 
-- **Python 3.9+** (tested with Python 3.12.3)
-- **pip** (tested with pip 24.0)
+- **Python 3.12+** (the production image uses Python 3.14.6)
+- **pip** (the install commands upgrade to the latest release)
 - **ngrok** with authenticated paid account (tested with ngrok 3.34.1)
 
 Verify prerequisites:
 ```bash
-python3 --version   # Should be 3.9+
+python3 --version   # Should be 3.12+
 pip3 --version
 ngrok version
 ngrok config check  # Should show "Valid configuration file"
@@ -64,13 +64,13 @@ pip install -r requirements.txt
 ```
 
 **Dependencies installed:**
-- pyyaml >= 6.0
-- structlog >= 23.0
-- aiohttp >= 3.9.0
-- pydantic >= 2.0
-- python-dotenv >= 1.0.0
-- click >= 8.0
-- psutil >= 5.9.0
+- pyyaml >= 6.0.3
+- structlog >= 26.1.0
+- aiohttp >= 3.14.3
+- pydantic >= 2.13.4
+- python-dotenv >= 1.2.2
+- click >= 8.4.2
+- psutil >= 7.2.2
 
 ### Step 2: Environment Configuration
 
