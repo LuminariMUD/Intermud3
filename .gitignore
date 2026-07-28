@@ -185,6 +185,7 @@ CLAUDE.md
 # I3 Gateway specific
 state/*.json
 state/*.yaml
+state/router-password
 config/local.yaml
 config/production.yaml
 config/staging.yaml

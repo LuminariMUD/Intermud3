@@ -1,6 +1,8 @@
 """Main I3 Gateway implementation."""
 
 import asyncio
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,8 @@ class I3Gateway:
         self.logger = structlog.get_logger()
         self.running = False
         self._shutdown_event = asyncio.Event()
+        self._router_password_path = Path(settings.state.directory) / "router-password"
+        self._router_password = self._load_router_password()
 
         # Initialize components
         self.state_manager = StateManager(
@@ -143,6 +147,50 @@ class I3Gateway:
         """Wait for the gateway to shutdown."""
         await self._shutdown_event.wait()
 
+    def _load_router_password(self) -> int:
+        """Load the router password from explicit config or persisted state."""
+        configured_password = self.settings.router.primary.password
+        if configured_password:
+            return configured_password
+
+        try:
+            saved_password = int(self._router_password_path.read_text().strip())
+            if saved_password > 0:
+                return saved_password
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError) as exc:
+            self.logger.warning(
+                "Could not load persisted router password",
+                path=str(self._router_password_path),
+                error=str(exc),
+            )
+
+        return 0
+
+    def _persist_router_password(self, password: int) -> None:
+        """Persist a router-assigned password atomically with owner-only access."""
+        if password <= 0:
+            return
+
+        self._router_password_path.parent.mkdir(parents=True, exist_ok=True)
+        file_descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".router-password-",
+            dir=self._router_password_path.parent,
+            text=True,
+        )
+        temporary_path = Path(temporary_name)
+
+        try:
+            os.fchmod(file_descriptor, 0o600)
+            with os.fdopen(file_descriptor, "w") as password_file:
+                password_file.write(f"{password}\n")
+            temporary_path.replace(self._router_password_path)
+            self._router_password_path.chmod(0o600)
+        finally:
+            if temporary_path.exists():
+                temporary_path.unlink()
+
     def is_connected(self) -> bool:
         """Check if gateway is connected to I3 router.
 
@@ -256,7 +304,7 @@ class I3Gateway:
             originator_user="",
             target_mud=router_name,
             target_user="",
-            password=getattr(self.settings.mud, "password", 0),
+            password=self._router_password,
             old_mudlist_id=old_mudlist_id,
             old_chanlist_id=old_chanlist_id,
             player_port=self.settings.mud.port,
@@ -342,6 +390,23 @@ class I3Gateway:
 
     async def _handle_startup_reply(self, packet: Any):
         """Handle startup reply from router."""
+        from .models.packet import StartupReplyPacket
+
+        if isinstance(packet, StartupReplyPacket) and packet.password > 0:
+            self._router_password = packet.password
+            try:
+                self._persist_router_password(packet.password)
+                self.logger.info(
+                    "Persisted router password",
+                    path=str(self._router_password_path),
+                )
+            except OSError as exc:
+                self.logger.error(
+                    "Could not persist router password",
+                    path=str(self._router_password_path),
+                    error=str(exc),
+                )
+
         self.logger.info("Received startup reply - connection established")
         await self.connection_manager._set_state(ConnectionState.READY)
 

@@ -11,11 +11,14 @@ from src.api.event_bridge import EventBridge
 from src.api.events import EventType
 from src.api.protocol import JSONRPCProtocol
 from src.api.session import Session
+from src.config.models import MudConfig, RouterConfig, RouterHostConfig, Settings
+from src.gateway import I3Gateway
 from src.models.connection import MudInfo, MudStatus
 from src.models.packet import (
     ChanlistReplyPacket,
     PacketFactory,
     PacketType,
+    StartupReplyPacket,
     WhoPacket,
 )
 from src.network.lpc import LPCDecoder
@@ -39,6 +42,24 @@ def mudlist_entry(state: int, address: str, port: int) -> list:
         {"tell": 1, "channel": 1},
         {"extra": "value"},
     ]
+
+
+def gateway_settings(state_directory: str, router_password: int = 0) -> Settings:
+    """Build gateway settings with an isolated persistence directory."""
+    return Settings(
+        mud=MudConfig(name="TestMUD", port=4100, admin_email="admin@example.com"),
+        router=RouterConfig(
+            primary=RouterHostConfig(
+                name="*router",
+                host="127.0.0.1",
+                port=8787,
+                password=router_password,
+            )
+        ),
+        gateway={"auth": {"enabled": False}},
+        api={"enabled": False},
+        state={"directory": state_directory},
+    )
 
 
 def test_mud_info_uses_protocol_field_order() -> None:
@@ -114,6 +135,42 @@ def test_packet_factory_parses_chanlist_reply() -> None:
     assert isinstance(packet, ChanlistReplyPacket)
     assert packet.packet_type == PacketType.CHANLIST_REPLY
     assert packet.chanlist_id == 42
+
+
+@pytest.mark.asyncio
+async def test_startup_reply_password_is_persisted_for_reconnect(tmp_path) -> None:
+    """The router-assigned password must survive process restarts."""
+    settings = gateway_settings(str(tmp_path / "state"))
+    gateway = I3Gateway(settings)
+    gateway.connection_manager._set_state = AsyncMock()
+    reply = StartupReplyPacket(
+        ttl=5,
+        originator_mud="*router",
+        originator_user="",
+        target_mud="TestMUD",
+        target_user="",
+        router_list=[],
+        password=8675309,
+    )
+
+    await gateway._handle_startup_reply(reply)
+
+    password_path = tmp_path / "state" / "router-password"
+    assert password_path.read_text() == "8675309\n"
+    assert password_path.stat().st_mode & 0o777 == 0o600
+    assert I3Gateway(settings)._router_password == 8675309
+
+
+@pytest.mark.asyncio
+async def test_explicit_router_password_is_sent_in_startup(tmp_path) -> None:
+    """An explicitly configured router password must be used for startup."""
+    gateway = I3Gateway(gateway_settings(str(tmp_path / "state"), router_password=42))
+    gateway.send_packet = AsyncMock(return_value=True)
+
+    await gateway._send_startup()
+
+    startup = gateway.send_packet.await_args.args[0]
+    assert startup.password == 42
 
 
 def test_lpc_decoder_accepts_legacy_single_byte_text() -> None:
