@@ -3,6 +3,7 @@
 import pytest
 
 from src.models.packet import (
+    ChannelMessagePacket,
     ChannelPacket,
     ErrorPacket,
     PacketFactory,
@@ -395,7 +396,26 @@ class TestPacketFactory:
 
     def test_create_channel_packets(self):
         """Test factory creates correct channel packets."""
-        for packet_type in ["channel-m", "channel-e", "channel-t"]:
+        message_array = [
+            "channel-m",
+            200,
+            "TestMUD",
+            "testuser",
+            0,
+            0,
+            "chat",
+            "Test User",
+            "The actual channel message",
+        ]
+
+        message_packet = PacketFactory.create_packet(message_array)
+
+        assert isinstance(message_packet, ChannelMessagePacket)
+        assert message_packet.channel == "chat"
+        assert message_packet.visname == "Test User"
+        assert message_packet.message == "The actual channel message"
+
+        for packet_type in ["channel-e", "channel-t"]:
             lpc_array = [packet_type, 200, "TestMUD", "testuser", "*", "*", "chat", "Message"]
 
             packet = PacketFactory.create_packet(lpc_array)

@@ -894,7 +894,7 @@ class PacketFactory:
     _packet_classes: dict[str, type[I3Packet]] = {
         PacketType.TELL.value: TellPacket,
         PacketType.EMOTETO.value: EmotetoPacket,
-        PacketType.CHANNEL_M.value: ChannelPacket,
+        PacketType.CHANNEL_M.value: ChannelMessagePacket,
         PacketType.CHANNEL_E.value: ChannelPacket,
         PacketType.CHANNEL_T.value: ChannelPacket,
         PacketType.WHO_REQ.value: WhoPacket,
