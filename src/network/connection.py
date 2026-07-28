@@ -118,7 +118,7 @@ class ConnectionManager:
         Returns:
             True if connection was successful
         """
-        if self.state != ConnectionState.DISCONNECTED:
+        if self.state not in (ConnectionState.DISCONNECTED, ConnectionState.ERROR):
             return False
 
         self._closing = False
@@ -294,6 +294,9 @@ class ConnectionManager:
             if min_backoff > 0:
                 await asyncio.sleep(min_backoff)
 
+            # Release this completed attempt before connect() runs so another
+            # failure can schedule the next backoff instead of getting stuck.
+            self._reconnect_task = None
             if not self._closing:
                 await self.connect()
 

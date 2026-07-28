@@ -4,7 +4,7 @@ This service handles finger-req and finger-reply packets to provide
 detailed information about specific users.
 """
 
-from datetime import datetime
+from datetime import datetime, datetime as DateTimeType
 from typing import Any
 
 import structlog
@@ -131,43 +131,57 @@ class FingerService(BaseService):
         Returns:
             User information dictionary or None if not found
         """
-        # Look up user session
-        session = await self.state_manager.get_session(username)
+        local_mud = self.gateway.settings.mud.name if self.gateway else "local"
+        session = await self.state_manager.find_user_session(local_mud, username)
 
-        if not session:
+        if not session or not session.is_online:
             # User not found or offline
             return None
 
         # Calculate idle time
         idle_time = int((datetime.now() - session.last_activity).total_seconds())
+        hide_ip = self.gateway is not None
+        if self.gateway:
+            service_settings = getattr(self.gateway.settings, "services", None)
+            finger_settings = getattr(service_settings, "finger", None)
+            if isinstance(finger_settings, dict):
+                hide_ip = finger_settings.get("hide_ip", True)
 
         # Build user info
+        title = getattr(session, "title", "")
+        real_name = getattr(session, "real_name", "")
+        email = getattr(session, "email", "")
+        ip_address = getattr(session, "ip_address", "")
+        login_time = getattr(session, "login_time", None)
         user_info = {
             "name": session.user_name,
-            "title": session.title or f"{session.user_name} the Adventurer",
-            "real_name": getattr(session, "real_name", ""),
-            "email": getattr(session, "email", ""),
-            "login_time": session.login_time.isoformat() if session.login_time else "",
+            "title": (
+                title
+                if isinstance(title, str) and title
+                else f"{session.user_name} the Adventurer"
+            ),
+            "real_name": real_name if isinstance(real_name, str) else "",
+            "email": email if isinstance(email, str) else "",
+            "login_time": (
+                login_time.isoformat()
+                if isinstance(login_time, DateTimeType)
+                else ""
+            ),
             "idle_time": idle_time,
             "ip_address": (
-                session.ip_address
-                if not self.gateway
-                or not self.gateway.settings.services.finger.get("hide_ip", True)
-                else ""
+                ""
+                if hide_ip or not isinstance(ip_address, str)
+                else ip_address
             ),
             "level": session.level,
             "extra": {},
         }
 
         # Add optional fields
-        if hasattr(session, "race") and session.race:
-            user_info["extra"]["race"] = session.race
-        if hasattr(session, "guild") and session.guild:
-            user_info["extra"]["guild"] = session.guild
-        if hasattr(session, "location") and session.location:
-            user_info["extra"]["location"] = session.location
-        if hasattr(session, "website") and session.website:
-            user_info["extra"]["website"] = session.website
+        for field_name in ("race", "guild", "location", "website"):
+            value = getattr(session, field_name, "")
+            if isinstance(value, str) and value:
+                user_info["extra"][field_name] = value
 
         return user_info
 

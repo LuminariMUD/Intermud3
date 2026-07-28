@@ -7,11 +7,11 @@ and the service registry for routing packets.
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from ..models.packet import I3Packet, PacketType
 from ..state.manager import StateManager
-
 
 logger = logging.getLogger(__name__)
 
@@ -163,11 +163,14 @@ class ServiceRegistry:
         self._packet_handlers: dict[PacketType, list[BaseService]] = {}
         self._lock = asyncio.Lock()
 
-    async def register(self, service_class: type[BaseService]) -> BaseService:
+    async def register(
+        self, service_class: type[BaseService], gateway: object | None = None
+    ) -> BaseService:
         """Register a service.
 
         Args:
             service_class: The service class to register
+            gateway: Optional gateway dependency passed to the service
 
         Returns:
             The instantiated service
@@ -177,7 +180,11 @@ class ServiceRegistry:
         """
         async with self._lock:
             # Instantiate the service
-            service = service_class(self.state_manager)
+            service = (
+                service_class(self.state_manager)
+                if gateway is None
+                else service_class(self.state_manager, gateway)
+            )
 
             # Check if already registered
             if service.service_name in self._services:
@@ -298,13 +305,19 @@ class ServiceRegistry:
 class ServiceManager:
     """High-level manager for I3 services."""
 
-    def __init__(self, state_manager: StateManager):
+    def __init__(
+        self,
+        state_manager: StateManager,
+        response_sender: Callable[[I3Packet], Awaitable[bool]] | None = None,
+    ) -> None:
         """Initialize the service manager.
 
         Args:
             state_manager: State manager instance
+            response_sender: Optional callback for generated service responses
         """
         self.state_manager = state_manager
+        self.response_sender = response_sender
         self.registry = ServiceRegistry(state_manager)
         self._packet_queue: asyncio.Queue = asyncio.Queue()
         self._processing_task: asyncio.Task | None = None
@@ -361,11 +374,8 @@ class ServiceManager:
                 # Route to appropriate service
                 response = await self.registry.route_packet(packet)
 
-                # If there's a response, it should be sent back
-                # This would be handled by the gateway layer
-                if response:
-                    # TODO: Send response through gateway
-                    pass
+                if response and self.response_sender:
+                    await self.response_sender(response)
 
             except TimeoutError:
                 continue

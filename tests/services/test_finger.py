@@ -1,7 +1,7 @@
 """Comprehensive unit tests for FingerService."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -16,7 +16,7 @@ from src.state.manager import StateManager
 def mock_state_manager():
     """Create a mock state manager."""
     manager = Mock(spec=StateManager)
-    manager.get_session = AsyncMock()
+    manager.find_user_session = AsyncMock()
     return manager
 
 
@@ -161,7 +161,7 @@ class TestFingerRequestHandling:
         self, finger_service, sample_finger_request, mock_state_manager, online_user_session
     ):
         """Test handling finger request for online user."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         result = await finger_service.handle_packet(sample_finger_request)
 
@@ -178,7 +178,7 @@ class TestFingerRequestHandling:
         self, finger_service, sample_finger_request, mock_state_manager
     ):
         """Test handling finger request for offline/nonexistent user."""
-        mock_state_manager.get_session.return_value = None
+        mock_state_manager.find_user_session.return_value = None
 
         result = await finger_service.handle_packet(sample_finger_request)
 
@@ -198,8 +198,8 @@ class TestFingerRequestHandling:
 
     async def test_finger_request_empty_username(self, finger_service, mock_state_manager):
         """Test handling finger request with empty username."""
-        # Mock get_session to return None for empty username
-        mock_state_manager.get_session.return_value = None
+        # Mock the presence lookup to return no matching username
+        mock_state_manager.find_user_session.return_value = None
 
         packet = Mock(spec=I3Packet)
         packet.packet_type = PacketType.FINGER_REQ
@@ -228,7 +228,7 @@ class TestFingerRequestHandling:
         self, finger_service, mock_state_manager, online_user_session
     ):
         """Test that finger requests are case-insensitive."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         packet = Mock(spec=I3Packet)
         packet.packet_type = PacketType.FINGER_REQ
@@ -251,7 +251,9 @@ class TestFingerRequestHandling:
         assert isinstance(result, FingerPacket)
         assert result.username == "TESTUSER"  # Should preserve original case
         # Should have found the user despite case difference
-        mock_state_manager.get_session.assert_called_with("testuser")  # lowercase
+        mock_state_manager.find_user_session.assert_called_with(
+            "TestMUD", "testuser"
+        )
 
     async def test_finger_request_with_number_username(self, finger_service, mock_state_manager):
         """Test handling finger request with numeric username field."""
@@ -280,7 +282,7 @@ class TestFingerRequestHandling:
         self, finger_service, mock_state_manager, online_user_session, sample_finger_request
     ):
         """Test that all user info fields are included correctly."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         result = await finger_service.handle_packet(sample_finger_request)
 
@@ -305,7 +307,7 @@ class TestFingerRequestHandling:
         self, finger_service, mock_state_manager, online_user_session, sample_finger_request
     ):
         """Test IP address hiding based on settings."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Test with IP hiding enabled (default)
         result = await finger_service.handle_packet(sample_finger_request)
@@ -346,7 +348,7 @@ class TestFingerCaching:
         self, finger_service, sample_finger_request, mock_state_manager, online_user_session
     ):
         """Test that finger results are cached."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # First request - should cache results
         result1 = await finger_service.handle_packet(sample_finger_request)
@@ -363,7 +365,7 @@ class TestFingerCaching:
         self, finger_service, sample_finger_request, mock_state_manager, online_user_session
     ):
         """Test that cache expires after TTL."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
         finger_service.cache_ttl = 0.1  # Very short cache
 
         # First request
@@ -382,7 +384,7 @@ class TestFingerCaching:
         self, finger_service, sample_finger_request, mock_state_manager
     ):
         """Test that only successful results are cached."""
-        mock_state_manager.get_session.return_value = None  # User not found
+        mock_state_manager.find_user_session.return_value = None  # User not found
 
         # Request for nonexistent user
         await finger_service.handle_packet(sample_finger_request)
@@ -394,7 +396,7 @@ class TestFingerCaching:
         self, finger_service, sample_finger_request, mock_state_manager, online_user_session
     ):
         """Test clearing the finger cache."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Add something to cache
         await finger_service.handle_packet(sample_finger_request)
@@ -477,7 +479,7 @@ class TestUserInfoRetrieval:
         self, finger_service, mock_state_manager, online_user_session
     ):
         """Test getting complete user information."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         user_info = await finger_service._get_user_info("testuser")
 
@@ -501,7 +503,7 @@ class TestUserInfoRetrieval:
         minimal_session.ip_address = "127.0.0.1"
         minimal_session.level = 1
 
-        mock_state_manager.get_session.return_value = minimal_session
+        mock_state_manager.find_user_session.return_value = minimal_session
 
         user_info = await finger_service._get_user_info("minimaluser")
 
@@ -515,7 +517,7 @@ class TestUserInfoRetrieval:
 
     async def test_get_user_info_nonexistent_user(self, finger_service, mock_state_manager):
         """Test getting info for nonexistent user."""
-        mock_state_manager.get_session.return_value = None
+        mock_state_manager.find_user_session.return_value = None
 
         user_info = await finger_service._get_user_info("nonexistent")
 
@@ -533,11 +535,11 @@ class TestUserInfoRetrieval:
         session.ip_address = "127.0.0.1"
         session.level = 1
 
-        mock_state_manager.get_session.return_value = session
+        mock_state_manager.find_user_session.return_value = session
 
         with patch("src.services.finger.datetime") as mock_datetime:
             # Mock current time to be 10 minutes later
-            current_time = past_time.replace(minute=past_time.minute + 10)
+            current_time = past_time + timedelta(minutes=10)
             mock_datetime.now.return_value = current_time
 
             user_info = await finger_service._get_user_info("testuser")
@@ -589,7 +591,7 @@ class TestConcurrentOperations:
         self, finger_service, mock_state_manager, online_user_session
     ):
         """Test handling concurrent finger requests."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Create multiple finger request packets
         requests = []
@@ -624,7 +626,7 @@ class TestConcurrentOperations:
         self, finger_service, sample_finger_request, mock_state_manager, online_user_session
     ):
         """Test cache operations are thread-safe."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         async def make_request():
             return await finger_service.handle_packet(sample_finger_request)
@@ -659,7 +661,7 @@ class TestEdgeCases:
         session.level = 30
         # Missing: real_name, email, race, guild, location, website
 
-        mock_state_manager.get_session.return_value = session
+        mock_state_manager.find_user_session.return_value = session
 
         user_info = await finger_service._get_user_info("testuser")
 
@@ -704,7 +706,7 @@ class TestEdgeCases:
         session.ip_address = "127.0.0.1"
         session.level = 30
 
-        mock_state_manager.get_session.return_value = session
+        mock_state_manager.find_user_session.return_value = session
 
         user_info = await finger_service._get_user_info("testuser")
 
@@ -713,7 +715,7 @@ class TestEdgeCases:
     async def test_no_gateway_in_ip_check(self, mock_state_manager, online_user_session):
         """Test IP hiding logic without gateway."""
         service = FingerService(mock_state_manager, None)
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         user_info = await service._get_user_info("testuser")
 

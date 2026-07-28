@@ -1,13 +1,18 @@
 """Comprehensive unit tests for LocateService."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from src.models.connection import UserSession
-from src.models.packet import I3Packet, LocatePacket, PacketType
+from src.models.packet import (
+    I3Packet,
+    LocatePacket,
+    PacketType,
+    PacketValidationError,
+)
 from src.services.locate import LocateService
 from src.state.manager import StateManager
 
@@ -17,6 +22,17 @@ def mock_state_manager():
     """Create a mock state manager."""
     manager = Mock(spec=StateManager)
     manager.sessions = {}
+    manager.find_user_session = AsyncMock(
+        side_effect=lambda _mud_name, user_name: next(
+            (
+                session
+                for session in manager.sessions.values()
+                if session.user_name.lower() == user_name.lower()
+                and session.is_online
+            ),
+            None,
+        )
+    )
     return manager
 
 
@@ -741,7 +757,7 @@ class TestEdgeCases:
 
         with patch("src.services.locate.datetime") as mock_datetime:
             # Mock current time to be 5 minutes later
-            current_time = past_time.replace(minute=past_time.minute + 5)
+            current_time = past_time + timedelta(minutes=5)
             mock_datetime.now.return_value = current_time
 
             result = await locate_service._search_local_user("testuser")
@@ -792,15 +808,13 @@ class TestEdgeCases:
 
     async def test_validate_empty_user_to_locate(self, locate_service):
         """Test validation with empty user_to_locate."""
-        packet = LocatePacket(
-            packet_type=PacketType.LOCATE_REQ,
-            ttl=200,
-            originator_mud="RemoteMUD",
-            originator_user="requester",
-            target_mud="TestMUD",
-            target_user="",
-            user_to_locate="",  # Empty user to locate
-        )
-
-        result = await locate_service.validate_packet(packet)
-        assert result is False
+        with pytest.raises(PacketValidationError, match="requires user"):
+            LocatePacket(
+                packet_type=PacketType.LOCATE_REQ,
+                ttl=200,
+                originator_mud="RemoteMUD",
+                originator_user="requester",
+                target_mud="TestMUD",
+                target_user="",
+                user_to_locate="",
+            )

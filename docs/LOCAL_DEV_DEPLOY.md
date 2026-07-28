@@ -1,293 +1,170 @@
-# Local Development Deployment Guide (WSL2 Ubuntu)
+# Local development
 
-This guide documents how to deploy the I3 Gateway locally on WSL2 Ubuntu for development and testing, with ngrok tunnels for external MUD access.
+These steps work on Linux and WSL2 and keep the gateway API local by default.
 
-## Environment Files
+## Manual setup
 
-| File | Purpose |
-|------|---------|
-| `.env` | **Primary** - Loaded automatically by the gateway at startup |
-| `.env.example` | Template file - copy to `.env` and customize |
-| `.env.local` | Optional - for personal overrides (not auto-loaded, mentioned in comments only) |
-
-The gateway loads `.env` by default. The `.env.local` pattern is a convention suggestion in comments but is **not** automatically loaded by the application.
-
-## Prerequisites
-
-Before starting, ensure you have:
-
-- **Python 3.12+** (the production image uses Python 3.14.6)
-- **pip** (the install commands upgrade to the latest release)
-- **ngrok** with authenticated paid account (tested with ngrok 3.34.1)
-
-Verify prerequisites:
 ```bash
-python3 --version   # Should be 3.12+
-pip3 --version
-ngrok version
-ngrok config check  # Should show "Valid configuration file"
+git clone https://github.com/LuminariMUD/Intermud3.git
+cd Intermud3
+
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+
+cp .env.example .env
 ```
 
-## Quick Start
+Edit `.env` and replace example values. The checked-in YAML expects
+`API_KEY_LUMINARI`, so add that exact variable even though the older environment
+template also contains `API_KEY_YOURMUD`:
 
-```bash
-cd /home/aiwithapex/projects/Intermud3
+```dotenv
+MUD_NAME=YourDevelopmentMUD
+MUD_PORT=4000
+MUD_ADMIN_EMAIL=admin@yourmud.example
 
-# 1. Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+I3_ROUTER_NAME=*wir
+I3_ROUTER_HOST=136.144.155.250
+I3_ROUTER_PORT=3004
 
-# 2. Create required directories
-mkdir -p logs state
+I3_GATEWAY_SECRET=replace-me
+API_KEY_LUMINARI=replace-me-too
 
-# 3. Start the gateway
-source venv/bin/activate
-python -m src --debug &
-
-# 4. Start ngrok tunnels (in separate terminal or background)
-ngrok start --all --config ngrok.yml &
-
-# 5. Verify
-curl http://localhost:8080/health
+API_HOST=127.0.0.1
+API_PORT=8080
 ```
 
-## Step-by-Step Setup
+`*wir` is the designated router for experimental client work. Use the
+production `*i4` endpoint only for an established MUD identity and ordinary
+interoperability use.
 
-### Step 1: Python Virtual Environment
+Validate and run:
 
 ```bash
-cd /home/aiwithapex/projects/Intermud3
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+python -m src --dry-run
+python -m src --log-level DEBUG
 ```
 
-**Dependencies installed:**
-- pyyaml >= 6.0.3
-- structlog >= 26.1.0
-- aiohttp >= 3.14.3
-- pydantic >= 2.13.4
-- python-dotenv >= 1.2.2
-- click >= 8.4.2
-- psutil >= 7.2.2
-
-### Step 2: Environment Configuration
-
-The `.env` file should be configured with:
+In another terminal:
 
 ```bash
-# MUD Configuration
-MUD_NAME=LuminariMUD
-MUD_PORT=4100
-MUD_ADMIN_EMAIL=admin@yourmud.com
-
-# I3 Router Configuration
-I3_ROUTER_HOST=204.209.44.3
-I3_ROUTER_PORT=8080
-
-# API Configuration
-API_WS_HOST=0.0.0.0
-API_WS_PORT=8080
-API_TCP_HOST=0.0.0.0
-API_TCP_PORT=8081
-
-# Security (IMPORTANT: Generate unique secrets!)
-I3_GATEWAY_SECRET=<your-64-char-hex-secret>
-API_KEY_LUMINARI=<your-api-key>
-
-# Logging
-LOG_LEVEL=DEBUG
-
-# Development Settings
-DEBUG=true
-RELOAD=true
+curl --fail http://127.0.0.1:8080/health
+curl --fail http://127.0.0.1:8080/health/ready
+curl http://127.0.0.1:8080/api/info
 ```
 
-**Generate a secure secret:**
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
+The WebSocket URL is `ws://127.0.0.1:8080/ws`; the `/ws` path is required.
+
+## Connect a local MUD
+
+Prefer TCP for a C/CircleMUD-style process:
+
+```text
+host: 127.0.0.1
+port: 8081
+framing: one JSON object plus newline
+first method: authenticate
 ```
 
-### Step 3: Create Required Directories
+Prefer WebSocket for Python, JavaScript, or browser-capable development:
 
-```bash
-mkdir -p logs state
+```text
+ws://127.0.0.1:8080/ws
 ```
 
-- `logs/` - Application logs (10MB rolling files)
-- `state/` - Persistent state data
+Follow [API.md](API.md) for the first request and test one local `ping` before
+sending network traffic.
 
-### Step 4: ngrok Configuration
+## Development helper script
 
-The ngrok settings are defined in `.env`:
+`scripts/deploy-local.sh` can create a `venv`, update dependencies, start the
+gateway in the background, and optionally start configured ngrok tunnels:
+
 ```bash
-NGROK_DOMAIN=i3.ngrok.dev
+./scripts/deploy-local.sh
+./scripts/deploy-local.sh --status
+./scripts/deploy-local.sh --stop
+```
+
+The script is convenience automation, not a service manager. It checks and
+clears configured ports before startup and may terminate an existing process
+using them. Review its output and use the manual path when those ports belong
+to another development service.
+
+It writes:
+
+- gateway log: `logs/gateway.log`
+- ngrok log: `logs/ngrok.log`
+- PID files: `.pids/`
+
+## Optional ngrok exposure
+
+ngrok is not needed for the I3 router connection; that connection is outbound.
+Use a tunnel only when a remote MUD must reach your local JSON-RPC API.
+
+The checked-in `ngrok.yml` defines:
+
+- HTTP/WebSocket tunnel to local port 8080;
+- raw TCP tunnel to local port 8081;
+- local inspector on port 4042.
+
+Set:
+
+```dotenv
+NGROK_AUTHTOKEN=...
+NGROK_DOMAIN=your-reserved-domain.example
 NGROK_INSPECTOR_PORT=4042
-NGROK_AUTHTOKEN=<your-authtoken>
-NGROK_API_KEY=<your-api-key>
 ```
 
-Create `ngrok.yml` in the project root (uses values from `.env`):
-
-```yaml
-version: "3"
-agent:
-    authtoken: <your-ngrok-authtoken>
-    web_addr: 127.0.0.1:4042  # NGROK_INSPECTOR_PORT from .env
-
-tunnels:
-    i3-websocket:
-        proto: http
-        addr: 8080
-        domain: i3.ngrok.dev  # NGROK_DOMAIN from .env (paid feature)
-        inspect: true
-
-    i3-tcp:
-        proto: tcp
-        addr: 8081
-```
-
-**Note:** Custom domains require a paid ngrok account. The `web_addr` port (4042) avoids conflicts with other ngrok instances.
-
-### Step 5: Start the I3 Gateway
-
-```bash
-source venv/bin/activate
-python -m src --debug
-```
-
-**Successful startup shows:**
-```json
-{"event": "I3 Gateway started successfully"}
-{"event": "Connection state changed", "state": "connected"}
-{"event": "API server started", "host": "0.0.0.0", "port": 8080}
-{"event": "TCP server listening on 0.0.0.0:8081"}
-```
-
-### Step 6: Start ngrok Tunnels
+Then:
 
 ```bash
 ngrok start --all --config ngrok.yml
 ```
 
-Check tunnel URLs:
+Treat a public tunnel as internet exposure:
+
+- keep API authentication enabled;
+- use unique short-lived development keys;
+- never use demo keys;
+- close the tunnel when testing finishes;
+- do not expose `/metrics` or logs unnecessarily;
+- prefer the HTTPS/WSS ngrok endpoint over plaintext.
+
+## Run checks
+
 ```bash
-curl -s http://localhost:4041/api/tunnels | python3 -m json.tool
+python -m pytest --collect-only -q -o addopts=''
+pytest
+ruff check src tests
+black --check src tests
+mypy src
+npm --prefix clients/javascript run lint
 ```
 
-**Example output:**
-- WebSocket: `https://xxxxx.ngrok-free.dev` -> localhost:8080
-- TCP: `tcp://x.tcp.eu.ngrok.io:xxxxx` -> localhost:8081
+The configured `pytest` command includes coverage and an 80% threshold. Use
+`-o addopts=''` only for focused debugging when you intentionally do not want
+the repository-wide coverage gate.
 
-### Step 7: Verification
+## Reset development state
 
-**Health Check (local):**
-```bash
-curl http://localhost:8080/health
-```
+The state directory contains the router password for the configured MUD name.
+Do not delete `state/router-password` merely to get a “clean” run. A router may
+reject the same identity when its issued password is lost.
 
-**Expected response:**
-```json
-{
-    "status": "healthy",
-    "service": "i3-gateway-api",
-    "websocket_connections": 0,
-    "active_sessions": 0
-}
-```
+Safe disposable state requires a disposable MUD name registered on the test
+router. Keep production and test identities in separate state directories.
 
-**Health Check (via ngrok):**
-```bash
-curl https://<your-ngrok-url>/health
-```
+## Common WSL2 notes
 
-## Port Summary
+- A Windows client can normally reach a WSL2 listener bound to `127.0.0.1` via
+  Windows localhost forwarding; if not, use the current WSL IP and bind
+  deliberately to `0.0.0.0`.
+- Windows firewall rules affect access from outside the host.
+- CRLF characters in hand-edited dotenv values can break boolean validation.
+  If an error shows a value such as `true\r`, convert the file to LF endings.
+- `localhost` inside a container is the container, not the WSL host. Put the
+  MUD and gateway on the same Compose network or use an explicit host route.
 
-| Port | Protocol | Purpose | External Access |
-|------|----------|---------|-----------------|
-| 8080 | HTTP/WS | WebSocket API, health checks | https://i3.ngrok.dev |
-| 8081 | TCP | Raw TCP socket API | tcp://x.tcp.eu.ngrok.io:xxxxx |
-| 4042 | HTTP | ngrok web interface | localhost only |
-
-## Running as Background Services
-
-### Start Gateway in Background
-```bash
-source venv/bin/activate
-nohup python -m src --debug > logs/gateway.log 2>&1 &
-echo $! > .gateway.pid
-```
-
-### Start ngrok in Background
-```bash
-nohup ngrok start --all --config ngrok.yml > logs/ngrok.log 2>&1 &
-echo $! > .ngrok.pid
-```
-
-### Stop Services
-```bash
-kill $(cat .gateway.pid) 2>/dev/null
-kill $(cat .ngrok.pid) 2>/dev/null
-```
-
-## Troubleshooting
-
-### ngrok "port already in use"
-If port 4040 is in use by another ngrok instance:
-```yaml
-# In ngrok.yml, add under agent:
-agent:
-    web_addr: 127.0.0.1:4041
-```
-
-### Gateway won't connect to I3 router
-1. Check firewall allows outbound TCP to 204.209.44.3:8080
-2. Verify `.env` has correct router settings
-3. Check logs: `tail -f logs/i3-gateway.log`
-
-### "Module not found" errors
-Ensure you've activated the virtual environment:
-```bash
-source venv/bin/activate
-```
-
-### ngrok tunnels not showing
-1. Check ngrok config syntax: `ngrok config check`
-2. View ngrok logs: `cat logs/ngrok.log`
-3. Ensure authtoken is valid
-
-## External MUD Connection
-
-External MUDs can connect using the ngrok URLs:
-
-**WebSocket Connection (recommended for web clients):**
-```
-wss://i3.ngrok.dev/ws
-```
-
-**TCP Connection (for traditional MUD clients):**
-```
-tcp://x.tcp.eu.ngrok.io:<port>
-```
-*(TCP port changes on each ngrok restart - check `curl http://localhost:4042/api/tunnels`)*
-
-Use the API key configured in `.env` for authentication.
-
-## Files Reference
-
-| File | Purpose |
-|------|---------|
-| `.env` | Environment variables |
-| `config/config.yaml` | Main configuration |
-| `ngrok.yml` | ngrok tunnel configuration |
-| `logs/` | Application logs |
-| `state/` | Persistent state |
-| `venv/` | Python virtual environment |
-
-## Next Steps
-
-- Test WebSocket connection with a client
-- Configure your MUD to use the gateway API
-- Monitor logs: `tail -f logs/i3-gateway.log`
-- Access ngrok web interface: `http://localhost:4041`

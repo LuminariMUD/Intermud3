@@ -1,414 +1,245 @@
-# Intermud3 Gateway Architecture
+# Intermud3 Gateway architecture
 
-## System Overview
+Intermud3 Gateway is a single-process asynchronous bridge with two protocol
+boundaries:
 
-The Intermud3 Gateway is a standalone service that bridges MUD servers with the global Intermud-3 network. It handles all I3 protocol complexity internally while exposing a simple JSON-RPC API for MUD integration.
-
-**Current Status**: Phase 3 Complete (2025-08-20) - Full JSON-RPC API with WebSocket/TCP support, client libraries, and comprehensive documentation. Ready for production deployment.
-
-**Key Achievements**:
-- Test Coverage: 78% overall with 1200+ comprehensive tests
-- Performance: 1000+ msg/sec throughput with <100ms latency
-- Client Libraries: Python, JavaScript/Node.js with TypeScript definitions
-- API Servers: WebSocket (port 8080) and TCP (port 8081) with event streaming
-
-## Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Global I3 Network                        │
-│                  (Routers, MUDs, Services)                   │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                    MudMode Protocol
-                    (LPC over TCP)
-                           │
-┌──────────────────────────┴──────────────────────────────────┐
-│                    I3 Gateway Service                        │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                  Network Layer                          │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │ │
-│  │  │   MudMode    │  │     LPC      │  │  Connection  │ │ │
-│  │  │   Protocol   │  │  Encoder/    │  │   Manager    │ │ │
-│  │  │              │  │   Decoder    │  │              │ │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                   Service Layer                        │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │ │
-│  │  │    Tell      │  │   Channel    │  │     Who      │ │ │
-│  │  │   Service    │  │   Service    │  │   Service    │ │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │ │
-│  │  │   Finger     │  │   Locate     │  │   Emoteto    │ │ │
-│  │  │   Service    │  │   Service    │  │   Service    │ │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                    Core Systems                        │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │ │
-│  │  │    State     │  │   Service    │  │   Packet     │ │ │
-│  │  │   Manager    │  │   Registry   │  │   Router     │ │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │ │
-│  │  │   Config     │  │   Metrics    │  │    Cache     │ │ │
-│  │  │   Manager    │  │  Collector   │  │   Manager    │ │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                     API Layer                          │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │ │
-│  │  │  JSON-RPC    │  │  WebSocket   │  │    Event     │ │ │
-│  │  │   Server     │  │   Server     │  │  Dispatcher  │ │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │ │
-│  └────────────────────────────────────────────────────────┘ │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-               JSON-RPC over WebSocket/TCP
-                WebSocket: Port 8080
-                TCP: Port 8081
-                           │
-┌──────────────────────────┴──────────────────────────────────┐
-│                      MUD Servers                             │
-│                   (Any Language/Platform)                    │
-└──────────────────────────────────────────────────────────────┘
+```text
+┌──────────────────── local/private side ────────────────────┐
+│                                                            │
+│   MUD process ── WebSocket JSON-RPC or TCP JSON-RPC ──┐    │
+│                                                       │    │
+│   admin/monitor ── HTTP health + metrics ─────────────┤    │
+│                                                       ▼    │
+│             API server, sessions, events, rate limits      │
+└───────────────────────────┬────────────────────────────────┘
+                            │ typed gateway operations
+                            ▼
+               services, packet models, state
+                            │
+                            ▼
+             MudMode framing + LPC serialization
+                            │ persistent TCP
+┌───────────────────────────▼────────────────────────────────┐
+│                    Intermud-3 router                       │
+└──────────────────── public/upstream side ──────────────────┘
 ```
 
-## Component Details
+The local MUD never parses LPC and the router never sees local JSON-RPC.
 
-### Network Layer
+## Runtime components
 
-#### MudMode Protocol Handler
-- Implements the binary MudMode protocol used by I3 routers
-- Handles 4-byte length prefix framing
-- Manages TCP socket communication
-- Implements keepalive mechanism
+### Entrypoint and configuration
 
-#### LPC Encoder/Decoder
-- Serializes/deserializes LPC data structures
-- Supports all LPC types: null, string, integer, float, array, mapping, buffer
-- Handles proper byte ordering (network/big-endian)
-- UTF-8 string encoding support
+`src/__main__.py` loads an optional dotenv file, expands `${NAME:default}`
+expressions in `config/config.yaml`, validates the result with Pydantic, sets up
+logging, and owns the event loop and signal-driven shutdown.
 
-#### Connection Manager
-- Maintains persistent connection to I3 router
-- Automatic reconnection with exponential backoff
-- Router failover support
-- Connection state tracking
+`python -m src --dry-run` exercises configuration loading without opening
+network sockets.
 
-### Service Layer
+### `I3Gateway`
 
-Each service implements a specific I3 protocol feature:
+`src/gateway.py` composes the process:
 
-#### Tell Service
-- Handles private messages between users
-- Message routing and delivery
-- Offline message queuing (optional)
+- `StateManager`
+- `ServiceManager` and registered I3 services
+- `ConnectionManager`
+- inbound packet queue
+- optional `APIServer`
 
-#### Channel Service
-- Public channel communication
-- Channel membership management
-- Message types: normal (m), emote (e), targeted (t)
+It translates connection state into I3 startup behavior, handles support
+packets (`startup-reply`, `mudlist`, `chanlist-reply`, and `error`), routes core
+packets to services, and forwards relevant packets to the event bridge.
 
-#### Who Service
-- User listing requests
-- Formatted user information
-- Idle time tracking
+### Router transport
 
-#### Finger Service
-- Detailed user information queries
-- Profile data management
-- Last seen tracking
+`src/network/mudmode.py` implements stream framing:
 
-#### Locate Service
-- Network-wide user search
-- Multi-MUD query coordination
-- Result aggregation
+1. four-byte unsigned big-endian payload length;
+2. LPC text payload;
+3. trailing NUL included in the advertised length.
 
-#### Emoteto Service
-- Targeted emotes across MUDs
-- Emote formatting
-- Delivery confirmation
+It retains incomplete frames across TCP reads and can extract multiple frames
+from one read. `src/network/lpc.py` maps Python strings, integers, floats,
+lists/tuples, dictionaries, booleans, bytes, and `None` to the deployed
+MudMode/LPC representation.
 
-### Core Systems
+`ConnectionManager` selects configured routers by priority, tracks connection
+state/counters, applies per-router exponential backoff with jitter, and
+schedules reconnection after a lost transport.
 
-#### State Manager
-- In-memory state storage
-- Optional persistence to disk
-- Session management
-- MUD list tracking
-- Channel membership
+### Packet models
 
-#### Service Registry
-- Dynamic service registration
-- Packet type to service routing
-- Service lifecycle management
-- Dependency injection
+`src/models/packet.py` gives each known I3 packet a validated Python model and
+an LPC-array conversion. `PacketFactory` selects a concrete model from the
+packet-type field.
 
-#### Packet Router
-- Incoming packet dispatch
-- Outgoing packet queuing
-- TTL management
-- Error handling
+The generic six-field header is:
 
-#### Configuration Manager
-- YAML configuration loading
-- Environment variable support
-- Dynamic reconfiguration
-- Validation
-
-#### Metrics Collector
-- Performance metrics
-- Message statistics
-- Error tracking
-- Health monitoring
-
-#### Cache Manager
-- TTL-based caching
-- LRU eviction
-- Memory management
-- Cache statistics
-
-### API Layer
-
-#### JSON-RPC Server
-- Request/response handling
-- Method dispatch
-- Parameter validation
-- Error responses
-
-#### WebSocket Server
-- Persistent connections
-- Real-time events
-- Binary frame support
-- Connection management
-
-#### Event Dispatcher
-- Event routing to connected clients
-- Event filtering
-- Broadcast support
-- Queue management
-
-## Data Flow
-
-### Incoming Message Flow
-
-```
-1. I3 Router → TCP Socket
-2. MudMode Protocol → Raw Bytes
-3. LPC Decoder → Packet Object
-4. Packet Router → Service Handler
-5. Service Handler → Process Message
-6. State Manager → Update State
-7. Event Dispatcher → Connected MUDs
-8. JSON-RPC → MUD Server
+```text
+[type, ttl, origin_mud, origin_user, target_mud, target_user, ...payload]
 ```
 
-### Outgoing Message Flow
+I3 uses integer zero for many absent/system address fields. Models normalize
+those values to convenient Python strings on input and restore protocol zeroes
+where required on output.
 
-```
-1. MUD Server → JSON-RPC Request
-2. API Server → Validate Request
-3. Service Handler → Create Packet
-4. Packet Router → Queue Message
-5. LPC Encoder → Binary Data
-6. MudMode Protocol → Frame Data
-7. TCP Socket → I3 Router
-```
+### Services
 
-## Design Patterns
+Registered service classes consume typed packets:
 
-### Asynchronous I/O
-- All network operations use asyncio
-- Non-blocking socket operations
-- Concurrent request handling
-- Event-driven architecture
+- `TellService`: tell and emoteto
+- `ChannelService`: channel traffic and selected channel-control packets
+- `WhoService`: who requests/replies
+- `FingerService`: finger requests/replies
+- `LocateService`: locate requests/replies
+- `RouterService`: routing/support behavior
 
-### Message Queue Pattern
-- Separate inbound/outbound queues
-- Priority-based processing
-- Retry mechanism
-- Dead letter queue
+Services may produce a response packet. The gateway sends that response once;
+ordinary inbound broadcasts are consumed and exposed locally, never reflected
+back to the router.
 
-### Service Registry Pattern
-- Loose coupling between services
-- Dynamic service discovery
-- Dependency injection
-- Plugin architecture
+See [the service matrix](intermud3_docs/services/README.md) for the difference
+between full, partial, and reference-only protocol areas.
 
-### Observer Pattern
-- Event-based communication
-- Decoupled components
-- Multiple event listeners
-- Event filtering
+### State
 
-### Factory Pattern
-- Packet creation from type
-- Service instantiation
-- Connection creation
-- Handler selection
+`StateManager` owns lock-protected:
 
-## Scalability Considerations
+- incremental mudlist state and version;
+- incremental channel-list state and version;
+- local public-player presence;
+- short-lived query caches;
+- API-related user-session data used by I3 responders.
 
-### Horizontal Scaling
-- Stateless service design
-- External state storage
-- Load balancer support
-- Multiple gateway instances
+Mud and channel snapshots are loaded on start and written on orderly shutdown
+when a state directory is configured. The router password is managed separately
+by `I3Gateway`: it is read at startup and written atomically with mode `0600`
+when a `startup-reply` assigns a new value.
 
-### Performance Optimization
-- Connection pooling
-- Message batching
-- Caching layer
-- Compression support
+The configured `state.save_interval` and backup fields are schema values but
+are not currently used for periodic snapshot writes. Operators should not
+describe them as active scheduled backups.
 
-### Resource Management
-- Memory pooling
-- Connection limits
-- Rate limiting
-- Circuit breakers
+### Local API
 
-## Security Architecture
+`APIServer` runs:
 
-### Authentication
-- Shared secret for MUD authentication
-- Router authentication protocol
-- Session management
-- Token-based auth (future)
+- an aiohttp HTTP/WebSocket listener;
+- an optional asyncio TCP JSON-RPC listener;
+- session/authentication management;
+- event dispatch and queues;
+- channel subscriptions;
+- background session cleanup and WebSocket ping tasks.
 
-### Authorization
-- Per-service access control
-- User-level permissions
-- Channel access lists
-- Admin privileges
+The handler registry exposes 20 methods. Remote I3 queries are asynchronous:
+the call emits an I3 request, while the reply returns later through the event
+bridge. This keeps the local connection responsive across network latency and
+remote-MUD availability.
 
-### Input Validation
-- Packet structure validation
-- Parameter sanitization
-- Length limits
-- Type checking
+## Startup sequence
 
-### Network Security
-- TLS support (optional)
-- IP whitelisting
-- Rate limiting
-- DDoS protection
-
-## Fault Tolerance
-
-### Connection Recovery
-- Automatic reconnection
-- Exponential backoff
-- Router failover
-- State recovery
-
-### Error Handling
-- Graceful degradation
-- Error isolation
-- Recovery procedures
-- Audit logging
-
-### Data Persistence
-- State snapshots
-- Transaction logs
-- Backup/restore
-- Data validation
-
-## Monitoring and Observability
-
-### Metrics
-- Message throughput
-- Latency percentiles
-- Error rates
-- Resource usage
-
-### Logging
-- Structured logging
-- Log levels
-- Log rotation
-- Centralized logging
-
-### Health Checks
-- Liveness probe
-- Readiness probe
-- Dependency checks
-- Performance metrics
-
-### Tracing
-- Request tracing
-- Distributed tracing
-- Performance profiling
-- Debug mode
-
-## Deployment Architecture
-
-### Container Deployment
-- Docker containerization
-- Kubernetes support
-- Health checks
-- Resource limits
-
-### Configuration Management
-- Environment variables
-- ConfigMaps
-- Secrets management
-- Feature flags
-
-### Service Discovery
-- DNS-based discovery
-- Service mesh integration
-- Load balancing
-- Circuit breakers
-
-## Development Workflow
-
-### Module Structure
-```
-src/
-├── network/       # Network protocol implementation
-├── services/      # I3 service handlers
-├── models/        # Data structures
-├── state/         # State management
-├── config/        # Configuration
-├── api/           # API server
-└── utils/         # Utilities
+```text
+load dotenv/YAML
+  → validate settings
+  → load persisted mud/channel state
+  → register enabled core services
+  → connect router TCP
+  → send startup-req-3
+  → receive startup-reply
+  → persist assigned router password
+  → receive mudlist/chanlist deltas
+  → report router-aware readiness
+  → serve local API throughout
 ```
 
-### Testing Strategy
-- Unit tests for components
-- Integration tests for services
-- End-to-end tests for flows
-- Performance tests
-- Mock I3 router for testing
+The API listener starts even when the first router connection fails, allowing
+health inspection while connection machinery works. `/health` therefore means
+the local API is alive; `/health/ready` is the upstream-aware gate.
 
-### Code Organization
-- Clear separation of concerns
-- Single responsibility principle
-- Dependency injection
-- Interface-based design
+## Incoming data flow
 
-## Future Enhancements
+```text
+router bytes
+  → frame buffer
+  → LPC decoder
+  → PacketFactory
+  → gateway packet queue
+  ├─ support packet → gateway/state
+  └─ service packet → service registry
+       ├─ optional response → router
+       └─ event bridge → filtered API sessions
+```
 
-### Planned Features
-- WebRTC support for direct MUD-to-MUD communication
-- GraphQL API alternative
-- Admin web dashboard
-- Kubernetes operator
-- Multi-region support
+Malformed frames or packets are rejected/logged at the earliest layer that has
+enough context. An unknown packet type is not silently treated as a supported
+service.
 
-### Performance Improvements
-- Protocol buffer serialization
-- Connection multiplexing
-- Smart routing
-- Predictive caching
+## Outgoing data flow
 
-### Extended Services
-- OOB mail service
-- News distribution
-- File transfer
-- Remote procedure calls
-- Inter-MUD commerce
+```text
+authenticated API request
+  → method handler
+  → typed packet
+  → LPC array
+  → LPC text + NUL
+  → length-prefixed frame
+  → current router TCP transport
+```
+
+The authenticated session supplies `originator_mud`; callers supply the local
+player identity (`from_user`) and destination fields.
+
+## Trust boundaries
+
+### Local API
+
+API keys authenticate MUD identities. TLS is not provided by the built-in
+listener; bind privately or terminate TLS at a reverse proxy. Configuration
+permissions currently filter events but are not a complete per-method
+authorization layer. Network policy is therefore part of the security model.
+
+### Upstream router
+
+The router-issued password is a credential. Protect the state directory,
+exclude it from diagnostics/backups shared with third parties, and never put
+the password in command lines or documentation.
+
+### Payloads
+
+I3 content is untrusted remote input. A local MUD should escape content for its
+own color/markup system and enforce game-specific policy even after protocol
+parsing succeeds.
+
+## Deployment topology
+
+The normal topology is one gateway identity per MUD:
+
+```text
+private host/network
+├── MUD process
+├── Intermud3 Gateway
+└── optional reverse proxy / metrics collector
+        │
+        └── outbound TCP to one I3 router
+```
+
+The process does not require inbound public access from the I3 router. Only the
+gateway’s outbound router connection is needed unless external local-API
+clients are intentionally supported.
+
+## Explicit non-claims
+
+The current architecture does not imply:
+
+- an implemented GraphQL or REST command API;
+- built-in TLS termination;
+- active/active clustered gateway state;
+- a database-backed or durable event queue;
+- implemented OOB mail/news/file services;
+- durable channel-history storage;
+- automatic use of every tuning field present in the configuration schema.
+
+Those boundaries keep the documented system aligned with the running code and
+the [roadmap](ROADMAP.md).
+

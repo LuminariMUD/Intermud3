@@ -1,830 +1,510 @@
-# Intermud3 Gateway API Reference
+# Intermud3 Gateway API reference
 
-## Overview
+This is the canonical reference for the API implemented by
+`src/api/server.py`, `src/api/tcp_server.py`, and
+`src/api/api_handlers.py`.
 
-The Intermud3 Gateway provides a JSON-RPC 2.0 API that allows MUD servers to integrate with the global Intermud-3 network. The API supports both WebSocket and TCP connections, enabling real-time bidirectional communication between MUDs and the I3 network.
+## Transports
 
-**Current Status**: Phase 3 Complete (2025-08-20) - Full implementation with 78% test coverage, 1200+ tests, achieving 1000+ msg/sec throughput with <100ms latency.
+### WebSocket
 
-## Table of Contents
+Connect to:
 
-1. [Connection and Authentication](#connection-and-authentication)
-2. [Transport Protocols](#transport-protocols)
-3. [Message Format](#message-format)
-4. [Error Handling](#error-handling)
-5. [API Methods](#api-methods)
-6. [Events and Notifications](#events-and-notifications)
-7. [Rate Limiting](#rate-limiting)
-8. [Session Management](#session-management)
-
-## Connection and Authentication
-
-### WebSocket Connection
-
-Connect to the WebSocket endpoint:
-```
-ws://localhost:8080/ws
+```text
+ws://HOST:8080/ws
 ```
 
-### TCP Connection
+Use `wss://` when TLS is terminated by a reverse proxy. The gateway’s built-in
+listener is plain HTTP/WebSocket.
 
-Connect to the TCP socket:
-```
-localhost:8081
-```
+A WebSocket connection may authenticate with:
 
-### Authentication
-
-All connections require authentication using an API key. Authentication can be done in two ways:
-
-#### 1. Header Authentication (WebSocket only)
 ```http
-X-API-Key: your-api-key-here
+X-API-Key: YOUR_API_KEY
 ```
 
-#### 2. Method Authentication (Both protocols)
+or by sending `authenticate` as its first message.
+
+### TCP
+
+Connect to `HOST:8081`. The server first emits a `welcome` JSON-RPC
+notification. Every client request and server response/event is one compact
+UTF-8 JSON object followed by a newline:
+
+```text
+{"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"api_key":"YOUR_API_KEY"}}\n
+```
+
+Do not use HTTP framing on the TCP port. A partial line remains buffered until
+the newline arrives.
+
+### One request per message
+
+Send one JSON-RPC request per WebSocket text frame or TCP line. The protocol
+parser contains batch data structures, but the active WebSocket/TCP dispatch
+path does not process JSON-RPC batch arrays; batch requests are not part of the
+supported API.
+
+Client requests should include an `id`. Server-originated events omit `id`.
+
+## Authentication and identity
+
+The server matches an API key against `api.auth.api_keys` in
+`config/config.yaml`. A successful match creates a session with the configured
+`mud_name`, permissions, and optional rate-limit override.
+
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
   "method": "authenticate",
-  "params": {
-    "api_key": "your-api-key-here"
-  }
+  "params": {"api_key": "YOUR_API_KEY"}
 }
 ```
 
-**Response:**
+WebSocket result:
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"status":"authenticated","mud_name":"YourMUD"}}
+```
+
+TCP also includes `session_id`.
+
+API-key permissions are currently used when filtering outbound events. The
+monolithic method dispatcher does not apply a separate per-method permission
+check, so network access to ports 8080/8081 and API-key distribution remain
+important trust boundaries.
+
+Rate limiting is a per-session token bucket. The default comes from
+`api.rate_limits.default`; an API key can specify `rate_limit_override`.
+The `by_method` configuration mapping is present in the schema but is not
+applied by the active session limiter.
+
+## Request and response shape
+
+Request:
+
 ```json
 {
   "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "status": "authenticated",
-    "mud_name": "YourMUD",
-    "session_id": "unique-session-id"
-  }
+  "id": 42,
+  "method": "METHOD",
+  "params": {}
 }
 ```
 
-## Transport Protocols
+Success:
 
-### WebSocket (Recommended)
-
-- **URL**: `ws://host:port/ws`
-- **Protocol**: JSON-RPC 2.0 over WebSocket frames
-- **Benefits**: Real-time bidirectional communication, automatic reconnection support
-- **Message Format**: JSON objects sent as WebSocket text frames
-
-### TCP Socket
-
-- **Host/Port**: Configured in gateway settings (default: port 8081)
-- **Protocol**: Line-delimited JSON-RPC 2.0
-- **Message Format**: JSON objects terminated by newline (`\n`)
-- **Benefits**: Compatibility with older systems, simple implementation
-
-## Message Format
-
-All messages follow the JSON-RPC 2.0 specification:
-
-### Request Format
 ```json
-{
-  "jsonrpc": "2.0",
-  "id": "unique-request-id",
-  "method": "method_name",
-  "params": {
-    "parameter1": "value1",
-    "parameter2": "value2"
-  }
-}
+{"jsonrpc":"2.0","id":42,"result":{}}
 ```
 
-### Response Format
+Error:
+
 ```json
 {
   "jsonrpc": "2.0",
-  "id": "unique-request-id",
-  "result": {
-    "status": "success",
-    "data": "response_data"
-  }
-}
-```
-
-### Notification Format (Events)
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "event_name",
-  "params": {
-    "event_data": "value"
-  }
-}
-```
-
-## Error Handling
-
-### Standard Error Codes
-
-| Code | Name | Description |
-|------|------|-------------|
-| -32700 | Parse Error | Invalid JSON received |
-| -32600 | Invalid Request | JSON is not a valid request object |
-| -32601 | Method Not Found | Method does not exist |
-| -32602 | Invalid Params | Invalid method parameters |
-| -32603 | Internal Error | Internal JSON-RPC error |
-
-### Custom Error Codes
-
-| Code | Name | Description |
-|------|------|-------------|
-| -32000 | Not Authenticated | Client not authenticated |
-| -32001 | Rate Limit Exceeded | Rate limit exceeded |
-| -32002 | Permission Denied | Permission denied for method |
-| -32003 | Session Expired | Session has expired |
-| -32004 | Gateway Error | Gateway communication error |
-
-### Error Response Format
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "request-id",
+  "id": 42,
   "error": {
-    "code": -32602,
-    "message": "Invalid params",
-    "data": {
-      "field": "target_mud",
-      "reason": "MUD not found in network"
-    }
+    "code": -32601,
+    "message": "Unknown method: METHOD"
   }
 }
 ```
 
-## API Methods
+## Methods at a glance
 
-### Communication Methods
+| Method | Required parameters | Result behavior |
+|---|---|---|
+| `authenticate` | `api_key` | Establishes the session |
+| `tell` | `target_mud`, `target_user`, `message` | Immediate acceptance result |
+| `emoteto` | `target_mud`, `target_user`, `emote` | Immediate acceptance result |
+| `channel_send` | `channel`, `message` | Immediate acceptance result |
+| `channel_emote` | `channel`, `emote` | Immediate acceptance result |
+| `channel_join` | `channel` | Subscribes locally and normally sends `channel-listen` |
+| `channel_leave` | `channel` | Unsubscribes locally and sends `channel-listen` off |
+| `channel_list` | none | Returns cached router channels |
+| `channel_who` | `channel` | Sends a query and returns cached membership |
+| `channel_history` | `channel` | Returns local stored history; persistence is not implemented |
+| `who` | `target_mud` | Sends request; answer is `who_reply` event |
+| `finger` | `target_mud`, `target_user` | Sends request; answer is `finger_reply` event |
+| `locate` | `target_user` | Broadcasts request; answers are `locate_reply` events |
+| `mudlist` | none | Returns cached router mudlist |
+| `presence_sync` | `users` | Replaces this MUD’s current local-player snapshot |
+| `ping` | none | Local API round-trip |
+| `status` | none | Router and session status |
+| `stats` | none | Current state counts |
+| `reconnect` | none | Requests an upstream reconnect |
+| `heartbeat` | none | Updates the client/API liveness exchange |
 
-#### tell
-Send a direct message to a user on another MUD.
+## Communication methods
 
-**Parameters:**
-- `target_mud` (string, required): Name of the target MUD
-- `target_user` (string, required): Name of the target user
-- `message` (string, required): Message to send (max 2048 characters)
-- `from_user` (string, optional): Sender's username
+### `tell`
 
-**Example:**
+Parameters:
+
+| Name | Type | Required | Meaning |
+|---|---|---|---|
+| `target_mud` | string | yes | Exact remote MUD name |
+| `target_user` | string | yes | Remote player; encoded lowercase on I3 |
+| `message` | string | yes | Tell text |
+| `from_user` | string | no | Local player; defaults to `Someone` |
+
+Result:
+
 ```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tell",
-  "params": {
-    "target_mud": "OtherMUD",
-    "target_user": "PlayerName",
-    "message": "Hello from our MUD!",
-    "from_user": "MyPlayer"
-  }
-}
+{"status":"sent","message_id":"tell_YourMUD_1785250000.123"}
 ```
 
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "status": "success",
-    "message": "Tell sent successfully"
-  }
-}
-```
+This is not a remote delivery receipt. Router errors are asynchronous.
 
-#### emoteto
-Send an emote to a specific user.
+### `emoteto`
 
-**Parameters:**
-- `target_mud` (string, required): Name of the target MUD
-- `target_user` (string, required): Name of the target user
-- `emote` (string, required): Emote text (max 1024 characters)
-- `from_user` (string, optional): Sender's username
+Parameters are `target_mud`, `target_user`, `emote`, and optional
+`from_user`. The key is `emote`, not `message`.
 
-**Example:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "emoteto",
-  "params": {
-    "target_mud": "OtherMUD",
-    "target_user": "PlayerName",
-    "emote": "waves enthusiastically",
-    "from_user": "MyPlayer"
-  }
-}
-```
-
-#### channel_send
-Send a message to a channel.
-
-**Parameters:**
-- `channel` (string, required): Channel name
-- `message` (string, required): Message to send (max 2048 characters)
-- `from_user` (string, optional): Sender's username
-- `visname` (string, optional): Visible name for sender
-
-**Example:**
 ```json
 {
   "jsonrpc": "2.0",
   "id": 3,
-  "method": "channel_send",
-  "params": {
-    "channel": "intermud",
-    "message": "Hello everyone!",
-    "from_user": "MyPlayer"
-  }
-}
-```
-
-#### channel_emote
-Send an emote to a channel.
-
-**Parameters:**
-- `channel` (string, required): Channel name
-- `emote` (string, required): Emote text (max 1024 characters)
-- `from_user` (string, optional): Sender's username
-- `visname` (string, optional): Visible name for sender
-
-### Information Methods
-
-#### who
-List users on a MUD.
-
-**Parameters:**
-- `target_mud` (string, required): Name of the target MUD
-- `filters` (object, optional): Filtering options
-  - `min_level` (number): Minimum user level
-  - `max_level` (number): Maximum user level
-  - `race` (string): Filter by race
-  - `guild` (string): Filter by guild
-
-**Example:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 4,
-  "method": "who",
+  "method": "emoteto",
   "params": {
     "target_mud": "OtherMUD",
-    "filters": {
-      "min_level": 10,
-      "race": "human"
-    }
+    "target_user": "friend",
+    "from_user": "Alyx",
+    "emote": "$N waves."
   }
 }
 ```
 
-**Response:**
+Result has `status: "sent"` and a generated `message_id`.
+
+## Channel methods
+
+### `channel_send`
+
+Parameters: `channel`, `message`, optional `from_user`, optional `visname`.
+
+### `channel_emote`
+
+Parameters: `channel`, `emote`, optional `from_user`, optional `visname`.
+The key is `emote`.
+
+### `channel_join`
+
+| Name | Type | Default | Meaning |
+|---|---|---|---|
+| `channel` | string | required | Channel name |
+| `listen_only` | boolean | `false` | Subscribe only inside the gateway; skip upstream `channel-listen` |
+
+`user_name` is accepted by older clients but is not used by the active
+handler. The subscription belongs to the authenticated MUD session.
+
+Result:
+
+```json
+{"status":"joined","channel":"intergossip"}
+```
+
+### `channel_leave`
+
+Requires `channel`; returns `{"status":"left","channel":"..."}`.
+
+### `channel_list`
+
+Optional `filter` members:
+
+- `type`: exact numeric channel type;
+- `owner`: exact owner MUD;
+- `min_members`: minimum cached member count.
+
+Result:
+
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 4,
-  "result": {
-    "status": "success",
-    "mud_name": "OtherMUD",
-    "users": [
-      {
-        "name": "Player1",
-        "level": 15,
-        "race": "human",
-        "guild": "warriors",
-        "idle_time": 120
-      }
-    ],
-    "count": 1
-  }
+  "status": "success",
+  "channels": [
+    {"name":"intergossip","owner":"SomeMUD","type":0,"member_count":0}
+  ],
+  "count": 1,
+  "subscribed_channels": ["intergossip"]
 }
 ```
 
-#### finger
-Get detailed information about a user.
+`refresh` is accepted for compatibility but the current handler reads the
+router-synchronized cache; it does not force a new chanlist request.
 
-**Parameters:**
-- `target_mud` (string, required): Name of the target MUD
-- `target_user` (string, required): Name of the target user
+### `channel_who`
 
-**Example:**
+Requires `channel`. It emits an upstream request and returns currently cached
+membership as:
+
 ```json
-{
-  "jsonrpc": "2.0",
-  "id": 5,
-  "method": "finger",
-  "params": {
-    "target_mud": "OtherMUD",
-    "target_user": "PlayerName"
-  }
-}
+{"status":"success","channel":"intergossip","members":[]}
 ```
 
-#### locate
-Find a user on the network.
+### `channel_history`
 
-**Parameters:**
-- `target_user` (string, required): Name of the user to locate
+Parameters: `channel`, optional `limit` (default 50, maximum 100), `before`,
+and `after`.
 
-**Example:**
+The state-manager method currently returns an empty list. Do not treat this
+method as durable channel logging.
+
+## Information methods
+
+### `who`
+
+Parameters: `target_mud`, optional `from_user`, optional `filters`.
+
 ```json
-{
-  "jsonrpc": "2.0",
-  "id": 6,
-  "method": "locate",
-  "params": {
-    "target_user": "PlayerName"
-  }
-}
+{"status":"requested","mud_name":"OtherMUD"}
 ```
 
-**Response:**
+If the router send fails immediately, the handler returns `status: "failed"`.
+The remote answer is a `who_reply` event.
+
+### `finger`
+
+Parameters: `target_mud`, `target_user`, optional `from_user`.
+
 ```json
-{
-  "jsonrpc": "2.0",
-  "id": 6,
-  "result": {
-    "status": "success",
-    "user_name": "PlayerName",
-    "locations": [
-      {
-        "mud_name": "MUD1",
-        "status": "online",
-        "idle_time": 300
-      }
-    ],
-    "found": true,
-    "count": 1
-  }
-}
+{"status":"requested","mud_name":"OtherMUD","user_name":"friend"}
 ```
 
-#### mudlist
-Get list of MUDs on the network.
+The answer is a `finger_reply` event.
 
-**Parameters:**
-- `refresh` (boolean, optional): Force refresh from router (default: false)
-- `filter` (object, optional): Filtering options
-  - `status` (string): Filter by status ("up" or "down")
-  - `driver` (string): Filter by driver type
-  - `has_service` (string): Filter by service availability
+### `locate`
 
-**Example:**
+Parameters: `target_user`, optional `from_user`.
+
 ```json
-{
-  "jsonrpc": "2.0",
-  "id": 7,
-  "method": "mudlist",
-  "params": {
-    "refresh": false,
-    "filter": {
-      "status": "up",
-      "has_service": "tell"
-    }
-  }
-}
+{"status":"requested","user_name":"friend"}
 ```
 
-### Channel Management Methods
+The request is broadcast; zero or more `locate_reply` events may follow.
 
-#### channel_join
-Join a channel.
+### `mudlist`
 
-**Parameters:**
-- `channel` (string, required): Channel name (max 32 characters)
-- `listen_only` (boolean, optional): Join in listen-only mode (default: false)
-- `user_name` (string, optional): Username for channel (default: "System")
-
-**Example:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 8,
-  "method": "channel_join",
-  "params": {
-    "channel": "intermud",
-    "listen_only": false,
-    "user_name": "MyPlayer"
-  }
-}
-```
-
-#### channel_leave
-Leave a channel.
-
-**Parameters:**
-- `channel` (string, required): Channel name
-- `user_name` (string, optional): Username for channel
-
-#### channel_list
-List available channels.
-
-**Parameters:**
-- `refresh` (boolean, optional): Force refresh from router
-- `filter` (object, optional): Filtering options
-  - `type` (number): Channel type (0=public, 1=private)
-  - `owner` (string): Filter by owner
-  - `min_members` (number): Minimum member count
-
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 9,
-  "result": {
-    "status": "success",
-    "channels": [
-      {
-        "name": "intermud",
-        "type": 0,
-        "owner": "",
-        "subscribed": true,
-        "member_count": 25
-      }
-    ],
-    "count": 1,
-    "subscribed_channels": ["intermud"]
-  }
-}
-```
-
-#### channel_who
-List members of a channel.
-
-**Parameters:**
-- `channel` (string, required): Channel name
-
-#### channel_history
-Get channel message history.
-
-**Parameters:**
-- `channel` (string, required): Channel name
-- `limit` (number, optional): Number of messages (1-100, default: 50)
-- `before` (string, optional): Get messages before timestamp
-- `after` (string, optional): Get messages after timestamp
-
-### Administrative Methods
-
-#### ping
-Health check and heartbeat.
-
-**Example:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 10,
-  "method": "ping"
-}
-```
-
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 10,
-  "result": {
-    "pong": true,
-    "timestamp": 1642678800.123
-  }
-}
-```
-
-#### status
-Get gateway status and session information.
-
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 11,
-  "result": {
-    "connected": true,
-    "mud_name": "YourMUD",
-    "session_id": "unique-session-id",
-    "uptime": 3600.5
-  }
-}
-```
-
-## Events and Notifications
-
-The gateway sends events as JSON-RPC notifications (no response expected).
-
-### Communication Events
-
-#### tell_received
-Received when a tell arrives for a user.
+Returns the current synchronized cache:
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "method": "tell_received",
-  "params": {
-    "from_mud": "RemoteMUD",
-    "from_user": "SenderName",
-    "to_user": "RecipientName",
-    "message": "Hello there!",
-    "timestamp": "2025-01-20T10:30:00Z"
-  }
-}
-```
-
-#### emoteto_received
-Received when an emote is sent to a user.
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "emoteto_received",
-  "params": {
-    "from_mud": "RemoteMUD",
-    "from_user": "SenderName",
-    "to_user": "RecipientName",
-    "emote": "waves at you",
-    "timestamp": "2025-01-20T10:30:00Z"
-  }
-}
-```
-
-#### channel_message
-Received when a message is sent to a subscribed channel.
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "channel_message",
-  "params": {
-    "channel": "intermud",
-    "from_mud": "RemoteMUD",
-    "from_user": "SenderName",
-    "message": "Hello channel!",
-    "visname": "SenderName",
-    "timestamp": "2025-01-20T10:30:00Z"
-  }
-}
-```
-
-#### channel_emote
-Received when an emote is sent to a subscribed channel.
-
-### System Events
-
-#### mud_online
-Notifies when a MUD comes online.
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "mud_online",
-  "params": {
-    "mud_name": "NewMUD",
-    "info": {
+  "status": "success",
+  "muds": [
+    {
+      "name": "OtherMUD",
+      "host": "203.0.113.10",
+      "port": 4000,
+      "tcp_port": 0,
+      "udp_port": 0,
       "driver": "FluffOS",
+      "mudlib": "ExampleLib",
       "mud_type": "LP",
-      "services": ["tell", "channel", "who"],
-      "admin_email": "admin@newmud.com"
+      "status": "up",
+      "services": {"tell":1,"channel":1},
+      "open_status": "open",
+      "admin_email": "admin@example.invalid"
     }
-  }
+  ],
+  "count": 1
 }
 ```
 
-#### mud_offline
-Notifies when a MUD goes offline.
+Optional `filter` members:
 
-#### channel_joined
-Notifies when successfully joined a channel.
+- `status`: exact status such as `up`;
+- `driver`: exact driver string;
+- `has_service`: require a service key.
 
-#### channel_left
-Notifies when left a channel.
+`refresh` is accepted but the current handler returns the synchronized cache.
 
-#### error_occurred
-Notifies of system errors.
+### `presence_sync`
 
-#### gateway_reconnected
-Notifies when gateway reconnects to router.
+Replaces the authenticated MUD’s complete public online-player snapshot.
+Omitting a previously present player marks that player absent.
 
-## Rate Limiting
+Constraints:
 
-### Default Limits
-- **Per session**: 100 requests per minute
-- **Burst allowance**: 20 requests
-- **By method**: Specific limits per method type
+- maximum 512 users;
+- every user is an object with a non-empty, unique `name`;
+- string values must be printable, trimmed, and within their limits;
+- `level` is an integer from 0 through 1000;
+- `idle` is an integer from 0 through 31,536,000 seconds;
+- `login_time` is a non-negative Unix number or a string of at most 64
+  characters.
 
-### Method-Specific Limits
-- `tell`: 30 per minute
-- `channel_send`: 50 per minute
-- `who`: 10 per minute
-- `mudlist`: 5 per minute
+Accepted string fields:
 
-### Rate Limit Headers (WebSocket only)
-Rate limit information is included in error responses:
+| Field | Maximum length |
+|---|---:|
+| `name` | 128 |
+| `title` | 256 |
+| `race` | 128 |
+| `guild` | 128 |
+| `location` | 256 |
+| `status` | 256 |
+
+Result:
+
+```json
+{"status":"synchronized","mud_name":"YourMUD","count":1}
+```
+
+Presence is current for 30 seconds. Publish a full snapshot more frequently
+than that if the gateway should answer inbound who/finger/locate requests.
+
+## Administrative methods
+
+### `ping`
+
+```json
+{"pong":true,"timestamp":"2026-07-28T17:00:00.000000"}
+```
+
+### `heartbeat`
+
+```json
+{"status":"ok","timestamp":"2026-07-28T17:00:00.000000"}
+```
+
+### `status`
+
+```json
+{
+  "connected": true,
+  "mud_name": "YourMUD",
+  "session_id": "UUID",
+  "uptime": 123.45
+}
+```
+
+### `stats`
+
+Includes:
+
+- `mud_count`
+- `online_muds`
+- `channel_count`
+- `session_count`
+- `mudlist_id`
+- `chanlist_id`
+- `gateway_connected`
+- `packets_sent`
+- `packets_received`
+
+The last two gateway fields currently fall back to zero unless the gateway
+publishes those attributes directly; connection-manager counters are separate.
+
+### `reconnect`
+
+Requests a disconnect/connect cycle and returns `{"status":"reconnecting"}`.
+Restrict API network access: the active method dispatcher does not currently
+enforce an admin permission for this call.
+
+## Server events
+
+Events are JSON-RPC notifications:
 
 ```json
 {
   "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32001,
-    "message": "Rate limit exceeded",
-    "data": {
-      "retry_after": 60,
-      "limit": 100,
-      "remaining": 0
-    }
-  }
+  "method": "EVENT_NAME",
+  "params": {"timestamp":"2026-07-28T17:00:00.000000Z"}
 }
 ```
 
-## Session Management
+Implemented event names:
 
-### Session Lifecycle
-1. **Connection**: Client connects via WebSocket or TCP
-2. **Authentication**: Client provides API key
-3. **Session Creation**: Server creates session with unique ID
-4. **Activity Tracking**: Server tracks all client activity
-5. **Timeout**: Session expires after inactivity (default: 1 hour)
-6. **Cleanup**: Server cleans up expired sessions
+| Category | Events |
+|---|---|
+| Communication | `tell_received`, `emoteto_received`, `channel_message`, `channel_emote`, `who_reply`, `finger_reply`, `locate_reply` |
+| Network/system | `mud_online`, `mud_offline`, `error_occurred`, `gateway_reconnected` |
+| Channel/user | `channel_joined`, `channel_left`, `user_joined_channel`, `user_left_channel`, `user_status_changed` |
+| Administrative | `maintenance_scheduled`, `shutdown_warning`, `rate_limit_warning` |
 
-### Session Persistence
-- Sessions persist across reconnections using session ID
-- Message queue maintains offline messages (max 1000, TTL 5 minutes)
-- Channel subscriptions are restored on reconnection
+Only events created by an active gateway path will be emitted. The enum also
+serves as a stable vocabulary for future producers.
 
-### Session Metrics
-Each session tracks:
-- Messages sent/received
-- Method call counts
-- Error counts
-- Connection duration
-- Last activity timestamp
+### Communication payloads
 
-## Configuration
+`tell_received`:
 
-### API Server Settings
-```yaml
-api:
-  host: "0.0.0.0"
-  port: 8080
-  
-  websocket:
-    enabled: true
-    max_connections: 1000
-    ping_interval: 30
-    
-  tcp:
-    enabled: true
-    port: 8081
-    max_connections: 500
-    
-  auth:
-    enabled: true
-    api_keys:
-      - key: "your-api-key"
-        mud_name: "YourMUD"
-        permissions: ["tell", "channel", "info"]
-```
-
-### Rate Limiting Configuration
-```yaml
-api:
-  rate_limits:
-    default:
-      per_minute: 100
-      burst: 20
-    by_method:
-      tell: 30
-      channel_send: 50
-```
-
-## Health Endpoints
-
-### Health Check
-```
-GET /health
-```
-
-Response:
 ```json
 {
-  "status": "healthy",
-  "service": "i3-gateway-api",
-  "websocket_connections": 42,
-  "active_sessions": 38
+  "from_mud": "OtherMUD",
+  "from_user": "friend",
+  "to_user": "Alyx",
+  "visname": "Friend",
+  "message": "Hello!"
 }
 ```
 
-### Liveness Probe
-```
-GET /health/live
-```
+`channel_message` / `channel_emote`:
 
-### Readiness Probe
-```
-GET /health/ready
-```
-
-### Metrics
-```
-GET /metrics
+```json
+{
+  "channel": "intergossip",
+  "from_mud": "OtherMUD",
+  "from_user": "friend",
+  "visname": "Friend",
+  "message": "Hello!"
+}
 ```
 
-Returns Prometheus-format metrics.
+`who_reply`, `finger_reply`, and `locate_reply` carry decoded remote response
+data plus addressing fields. Consumers should ignore unknown fields for
+forward compatibility.
 
-## Best Practices
+## Error codes
 
-### Connection Management
-- Use WebSocket for real-time applications
-- Implement reconnection logic with exponential backoff
-- Handle session restoration gracefully
-- Monitor connection health with ping/pong
+The protocol defines:
 
-### Error Handling
-- Always check for error responses
-- Implement retry logic for transient errors
-- Log all errors for debugging
-- Handle rate limiting gracefully
+| Code | Name |
+|---:|---|
+| `-32700` | Parse error |
+| `-32600` | Invalid request |
+| `-32601` | Method not found |
+| `-32602` | Invalid parameters |
+| `-32603` | Internal error |
+| `-32000` | Not authenticated |
+| `-32001` | Rate limit exceeded |
+| `-32002` | Permission denied |
+| `-32003` | Session expired |
+| `-32004` | Gateway error |
 
-### Performance
-- Batch related operations when possible
-- Use appropriate rate limits
-- Monitor session metrics
-- Implement message queuing for offline handling
+The WebSocket and TCP wrappers differ in a few error-mapping details. In
+particular, exceptions raised inside active method handlers are currently
+reported as internal errors. Clients should branch primarily on the numeric
+code and retain the message for diagnostics.
 
-### Security
-- Keep API keys secure
-- Use TLS in production
-- Implement proper input validation
-- Monitor for abuse patterns
+## HTTP operational endpoints
 
-## Examples
+All are served on the API HTTP port (default 8080):
 
-### Basic Tell Implementation
-```python
-import asyncio
-import websockets
-import json
+| Path | Meaning |
+|---|---|
+| `/health` | Local API health and current WebSocket/session counts |
+| `/health/live` | Process liveness |
+| `/health/ready` | HTTP 200 only when the upstream router is connected |
+| `/metrics` | Prometheus-text gauges for WebSocket connections and active API sessions |
+| `/api/info` | API protocol/transport metadata |
 
-async def send_tell():
-    uri = "ws://localhost:8080/ws"
-    
-    async with websockets.connect(uri) as websocket:
-        # Authenticate
-        auth_msg = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "authenticate",
-            "params": {"api_key": "your-api-key"}
-        }
-        await websocket.send(json.dumps(auth_msg))
-        response = await websocket.recv()
-        print("Auth response:", response)
-        
-        # Send tell
-        tell_msg = {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tell",
-            "params": {
-                "target_mud": "OtherMUD",
-                "target_user": "Player",
-                "message": "Hello!",
-                "from_user": "MyPlayer"
-            }
-        }
-        await websocket.send(json.dumps(tell_msg))
-        response = await websocket.recv()
-        print("Tell response:", response)
+The current `/api/info` payload contains a reserved `/api/docs` value, but the
+server does not register that route. This Markdown file is the documentation
+endpoint.
 
-asyncio.run(send_tell())
-```
+## Security and deployment
 
-### Event Handling
-```python
-async def handle_events():
-    uri = "ws://localhost:8080/ws"
-    
-    async with websockets.connect(uri) as websocket:
-        # Authenticate first...
-        
-        # Listen for events
-        async for message in websocket:
-            data = json.loads(message)
-            
-            if data.get("method") == "tell_received":
-                params = data["params"]
-                print(f"Tell from {params['from_user']}@{params['from_mud']}: {params['message']}")
-            
-            elif data.get("method") == "channel_message":
-                params = data["params"]
-                print(f"[{params['channel']}] {params['from_user']}: {params['message']}")
-```
+- Bind the API to loopback or a private network unless remote access is
+  required.
+- Terminate TLS at a maintained reverse proxy and use `wss://` externally.
+- Replace all example keys and do not log authentication payloads.
+- Treat `state/router-password` as a credential.
+- Do not infer method authorization from configured permission labels until the
+  dispatcher enforces it; use network controls and separate credentials.
+- Apply input and output limits at the proxy as defense in depth.
 
-This API reference provides a complete guide to integrating with the Intermud3 Gateway. For additional examples and integration guides, see the accompanying documentation files.
+See [Deployment](DEPLOYMENT.md) and [Architecture](ARCHITECTURE.md) for trust
+boundaries and operating guidance.
+

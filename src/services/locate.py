@@ -80,7 +80,7 @@ class LocateService(BaseService):
         )
 
         # Check if this is a broadcast request (target_mud == 0)
-        is_broadcast = packet.target_mud == "0" or packet.target_mud == 0
+        is_broadcast = not packet.target_mud or packet.target_mud == "0"
 
         # Check cache first
         cache_key = f"locate:{packet.user_to_locate.lower()}"
@@ -179,19 +179,16 @@ class LocateService(BaseService):
         Returns:
             User information if found, None otherwise
         """
-        # Search sessions for matching user (case-insensitive)
-        username_lower = username.lower()
+        local_mud = self.gateway.settings.mud.name if self.gateway else "local"
+        session = await self.state_manager.find_user_session(local_mud, username)
+        if session and session.is_online:
+            idle_time = int((datetime.now() - session.last_activity).total_seconds())
 
-        for session_id, session in self.state_manager.sessions.items():
-            if session.user_name.lower() == username_lower and session.is_online:
-                # Calculate idle time
-                idle_time = int((datetime.now() - session.last_activity).total_seconds())
-
-                return {
-                    "user": session.user_name,
-                    "idle_time": idle_time,
-                    "status": session.status_message or "",
-                }
+            return {
+                "user": session.user_name,
+                "idle_time": max(0, idle_time),
+                "status": session.status_message or "",
+            }
 
         return None
 

@@ -1,7 +1,7 @@
 """Comprehensive unit tests for WhoService."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -17,6 +17,9 @@ def mock_state_manager():
     """Create a mock state manager."""
     manager = Mock(spec=StateManager)
     manager.sessions = {}
+    manager.get_sessions_for_mud = AsyncMock(
+        side_effect=lambda _mud_name: list(manager.sessions.values())
+    )
     return manager
 
 
@@ -552,7 +555,7 @@ class TestEdgeCases:
 
         with patch("src.services.who.datetime") as mock_datetime:
             # Mock current time to be 5 minutes later
-            current_time = past_time.replace(minute=past_time.minute + 5)
+            current_time = past_time + timedelta(minutes=5)
             mock_datetime.now.return_value = current_time
 
             users = await who_service._get_online_users({})

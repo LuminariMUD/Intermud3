@@ -184,6 +184,26 @@ class EventBridge:
         Args:
             packet: Error packet
         """
+        bad_packet_type = (
+            packet.bad_packet[0]
+            if packet.bad_packet and isinstance(packet.bad_packet[0], str)
+            else ""
+        )
+        if bad_packet_type == PacketType.LOCATE_REQ.value and packet.error_code in {
+            "unk-dst",
+            "unk-type",
+            "not-imp",
+        }:
+            # locate-req is a network broadcast. Older/nonparticipating MUDs
+            # commonly reject that packet, but those rejections do not mean
+            # the locate failed and should not drown out valid replies.
+            logger.debug(
+                "Ignored locate broadcast rejection",
+                from_mud=packet.originator_mud,
+                error_code=packet.error_code,
+            )
+            return
+
         event_data = {
             "error_code": packet.error_code,
             "error_message": packet.error_message,

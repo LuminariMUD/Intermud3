@@ -1,766 +1,331 @@
-# Intermud3 Gateway Deployment Guide
+# Deployment guide
 
-## Project Status
-- **Current Phase**: Phase 3 Complete (2025-08-20) - Ready for Production
-- **Phase 2 Complete**: Core services implemented
-- **Phase 3 Complete**: JSON-RPC API, WebSocket/TCP servers, client libraries, full documentation
-- **Test Coverage**: 78% overall with 1200+ tests
-- **Performance**: 1000+ msg/sec throughput, <100ms latency achieved
-- **Version**: 0.3.0
+Intermud3 Gateway is an asyncio service with one outbound TCP connection to an
+I3 router and two optional local API listeners. A production deployment should
+protect three things:
 
-## Table of Contents
-- [Prerequisites](#prerequisites)
-- [Installation Methods](#installation-methods)
-- [Configuration](#configuration)
-- [Running the Gateway](#running-the-gateway)
-- [Docker Deployment](#docker-deployment)
-- [Production Deployment](#production-deployment)
-- [Monitoring](#monitoring)
-- [Troubleshooting](#troubleshooting)
+1. the local JSON-RPC API;
+2. API keys and the gateway secret;
+3. the router password persisted under `state/`.
 
-## Prerequisites
+## Supported runtime
 
-### System Requirements
-- Python 3.12 or higher
-- 512MB RAM minimum (1GB recommended)
-- 100MB disk space
-- Network connectivity to I3 routers
+- Python 3.12 or newer
+- Linux is the primary service/container target
+- outbound TCP to the selected I3 router
+- local ports 8080 (HTTP/WebSocket) and, when enabled, 8081 (TCP)
 
-### Network Requirements
-- Outbound TCP port 8080 (to I3 routers)
-- Inbound TCP port 8080 (WebSocket API)
-- Inbound TCP port 8081 (TCP API)
-- Stable internet connection
+No inbound connection from an I3 router is required for core in-band services.
 
-## Installation Methods
+## Configuration model
 
-### Quick Deploy (Recommended for Production)
+Configuration is loaded in this order:
+
+1. `-e/--env-file` is loaded with python-dotenv;
+2. `-c/--config` YAML is read;
+3. scalar YAML values of the exact form `${NAME:default}` are expanded;
+4. the result is validated by `src.config.models.Settings`;
+5. `--debug` and `--log-level` apply CLI overrides.
+
+Validate without opening sockets:
 
 ```bash
-# As root, create a dedicated user
-useradd -m -s /bin/bash intermud3
-usermod -aG docker intermud3  # If using Docker
-mkdir -p /home/intermud3/{logs,data}
-chown -R intermud3:intermud3 /home/intermud3/
-
-# Switch to the intermud3 user
-sudo su - intermud3
-
-# Clone and setup
-git clone https://github.com/LuminariMUD/Intermud3.git
-cd Intermud3
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Configure
-cp .env.example .env
-nano .env  # Set your MUD_NAME and other settings
-
-# Test run
-python -m src  # Ctrl+C to stop when confirmed working
+python -m src --config config/config.yaml --env-file .env --dry-run
 ```
 
-### Method 1: From Source
+### Required identity and secrets
 
-```bash
-# Clone the repository
-git clone https://github.com/LuminariMUD/Intermud3.git
-cd Intermud3
+For the checked-in YAML:
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+```dotenv
+MUD_NAME=YourMUD
+MUD_PORT=4000
+MUD_ADMIN_EMAIL=admin@yourmud.example
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy configuration
-cp .env.example .env
-# Edit .env to set your MUD name and other settings
-```
-
-### Method 2: Using pip (Future)
-
-```bash
-pip install intermud3-gateway
-```
-
-### Method 3: Docker
-
-```bash
-docker pull intermud3/gateway:latest
-```
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file in the project root:
-
-```bash
-# API Configuration
-API_WS_HOST=0.0.0.0
-API_WS_PORT=8080
-API_TCP_HOST=0.0.0.0
-API_TCP_PORT=8081
-I3_GATEWAY_SECRET=your-secret-key-here
-
-# MUD Configuration
-MUD_NAME=LuminariMUD
-MUD_PORT=4100
-MUD_ADMIN_EMAIL=max@aiwithapex.com
-MUD_TYPE=Circle
-MUD_STATUS=open
-
-# I3 Router Configuration
+I3_ROUTER_NAME=*i4
 I3_ROUTER_HOST=204.209.44.3
 I3_ROUTER_PORT=8080
-I3_ROUTER_NAME=*i3
 
-# Logging
-LOG_LEVEL=INFO
-LOG_FILE=/var/log/i3-gateway.log
-
-# Performance
-MAX_CONNECTIONS=100
-MESSAGE_QUEUE_SIZE=1000
-CACHE_TTL=300
-
-# Security
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_TELLS=10
-RATE_LIMIT_CHANNELS=20
+I3_GATEWAY_SECRET=generate-a-strong-random-value
+API_KEY_LUMINARI=generate-a-separate-strong-random-value
 ```
 
-### YAML Configuration
+Generate secrets without copying them into shell history:
 
-Edit `config/config.yaml`:
+```bash
+python -c 'import secrets; print(secrets.token_urlsafe(48))'
+```
+
+Run that command separately for each value, then place the results in a
+root/service-user-readable environment file.
+
+`API_KEY_LUMINARI` is the variable referenced by the primary API-key entry in
+the checked-in `config/config.yaml`; its name does not force the MUD name to be
+LuminariMUD. Rename the YAML entry if a deployment-specific variable name is
+preferred.
+
+The checked-in demo/admin values are examples, not deployment credentials.
+
+### Router selection
+
+The current default is:
+
+```yaml
+router:
+  primary:
+    name: "*i4"
+    host: 204.209.44.3
+    port: 8080
+    password: 0
+```
+
+A first registration sends password zero. The router assigns a credential in
+`startup-reply`; the gateway persists it to
+`STATE_DIRECTORY/router-password` and reuses it on restart. Do not set a
+different password in the environment after registration unless the router
+operator instructs you to.
+
+Use `*wir` at `136.144.155.250:3004` for experimental client testing. See
+[router guidance](gateway_list.md).
+
+### API binding
+
+The built-in listener is not a TLS server. For a same-host MUD, prefer:
 
 ```yaml
 api:
-  websocket:
-    host: ${API_WS_HOST:0.0.0.0}
-    port: ${API_WS_PORT:8080}
+  host: 127.0.0.1
+  port: 8080
   tcp:
-    host: ${API_TCP_HOST:0.0.0.0}
-    port: ${API_TCP_PORT:8081}
-  auth:
-    secret: ${I3_GATEWAY_SECRET}
-  
-mud:
-  name: ${MUD_NAME}
-  port: ${MUD_PORT:4000}
-  admin_email: ${MUD_ADMIN_EMAIL}
-  type: ${MUD_TYPE:LP}
-  status: ${MUD_STATUS:Development}
-  
-router:
-  primary:
-    name: ${I3_ROUTER_NAME:*i3}
-    host: ${I3_ROUTER_HOST:204.209.44.3}
-    port: ${I3_ROUTER_PORT:8080}
-  fallback:
-    - name: "*dalet"
-      host: "97.107.133.86"
-      port: 8787
-    - name: "*wpr"
-      host: "195.242.99.94"
-      port: 8080
-      
-services:
-  tell:
     enabled: true
-    queue_size: 100
-  channel:
-    enabled: true
-    default_channels:
-      - chat
-      - code
-  who:
-    enabled: true
-    cache_ttl: 60
-  finger:
-    enabled: true
-  locate:
-    enabled: true
-  emoteto:
-    enabled: true
-    
-logging:
-  level: ${LOG_LEVEL:INFO}
-  file: ${LOG_FILE}
-  format: json
-  rotate_size: 10485760  # 10MB
-  backup_count: 5
-  
-performance:
-  max_connections: ${MAX_CONNECTIONS:100}
-  message_queue_size: ${MESSAGE_QUEUE_SIZE:1000}
-  cache_ttl: ${CACHE_TTL:300}
-  connection_timeout: 30
-  reconnect_delay: 5
-  
-security:
-  rate_limiting:
-    enabled: ${RATE_LIMIT_ENABLED:true}
-    tells_per_minute: ${RATE_LIMIT_TELLS:10}
-    channels_per_minute: ${RATE_LIMIT_CHANNELS:20}
-    who_per_minute: 5
-  ip_whitelist: []
-  ip_blacklist: []
+    port: 8081
 ```
 
-## Running the Gateway
+If WebSocket clients are remote, keep the backend private and publish it
+through a TLS reverse proxy. Disable TCP unless a local integration uses it.
 
-### Development Mode
+## Source deployment with systemd
+
+The following layout keeps code, configuration, state, and logs owned by a
+dedicated account:
 
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Run with default config (uses .env and config/config.yaml)
-python -m src
-
-# Run with specific config
-python -m src -c config/config.yaml
-
-# Run with debug logging
-LOG_LEVEL=DEBUG python -m src
-
-# Run with environment file
-python -m src --env-file production.env
+sudo useradd --system --create-home --home-dir /opt/intermud3 \
+  --shell /usr/sbin/nologin intermud3
+sudo install -d -o intermud3 -g intermud3 \
+  /opt/intermud3/app /var/lib/intermud3 /var/log/intermud3
+sudo -u intermud3 git clone \
+  https://github.com/LuminariMUD/Intermud3.git /opt/intermud3/app
+sudo -u intermud3 python3 -m venv /opt/intermud3/app/.venv
+sudo -u intermud3 /opt/intermud3/app/.venv/bin/pip install \
+  --upgrade pip
+sudo -u intermud3 /opt/intermud3/app/.venv/bin/pip install \
+  /opt/intermud3/app
 ```
 
-### Production Mode
+Create `/etc/intermud3.env` with mode 600:
 
 ```bash
-# Using gunicorn (for WSGI compatibility)
-gunicorn -w 4 -k uvicorn.workers.UvicornWorker src.gateway:app
-
-# Using supervisor
-supervisorctl start i3-gateway
-
-# Using systemd
-systemctl start i3-gateway
+sudo install -m 600 -o root -g root /dev/null /etc/intermud3.env
+sudoedit /etc/intermud3.env
 ```
 
-## Docker Deployment
-
-### Building the Image
-
-```bash
-# Build from Dockerfile
-docker build -t intermud3-gateway:latest .
-
-# Build with custom tag
-docker build -t myregistry/i3-gateway:v1.0.0 .
-```
-
-### Running with Docker
-
-```bash
-# Basic run
-docker run -d \
-  --name i3-gateway \
-  -p 8080:8080 \
-  -p 8081:8081 \
-  -v $(pwd)/config:/app/config \
-  -v $(pwd)/logs:/app/logs \
-  intermud3-gateway:latest
-
-# With environment variables
-docker run -d \
-  --name i3-gateway \
-  -p 8080:8080 \
-  -p 8081:8081 \
-  -e MUD_NAME=MyMUD \
-  -e MUD_PORT=4000 \
-  -e LOG_LEVEL=DEBUG \
-  intermud3-gateway:latest
-
-# With env file
-docker run -d \
-  --name i3-gateway \
-  -p 8080:8080 \
-  -p 8081:8081 \
-  --env-file .env \
-  intermud3-gateway:latest
-```
-
-### Docker Compose
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  gateway:
-    image: intermud3-gateway:latest
-    container_name: i3-gateway
-    restart: unless-stopped
-    ports:
-      - "8080:8080"  # WebSocket API
-      - "8081:8081"  # TCP API
-    environment:
-      - MUD_NAME=${MUD_NAME}
-      - MUD_PORT=${MUD_PORT}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    volumes:
-      - ./config:/app/config
-      - ./logs:/app/logs
-      - ./data:/app/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - mud-network
-
-networks:
-  mud-network:
-    driver: bridge
-```
-
-Run with docker-compose:
-
-```bash
-docker-compose up -d
-docker-compose logs -f gateway
-docker-compose down
-```
-
-## Production Deployment
-
-### Pre-Production Checklist
-
-Before deploying to production:
-
-1. **Register MUD Name with I3 Network**
-   - Contact I3 router administrators to register "LuminariMUD"
-   - This prevents the 5-minute disconnection cycle for unregistered MUDs
-   - Primary router admin contact: Check *i3 router status page
-
-2. **Generate Production Secrets**
-   ```bash
-   # Generate API key for LuminariMUD
-   openssl rand -hex 32 > luminari-api-key.txt
-   
-   # Generate gateway secret
-   openssl rand -hex 32 > gateway-secret.txt
-   ```
-
-3. **SSL/TLS Setup (Optional but Recommended)**
-   - Obtain SSL certificate for WebSocket connections
-   - Configure reverse proxy (nginx/Apache) for SSL termination
-
-4. **Backup Strategy**
-   - Set up automated daily backups of state/ directory
-   - Configure backup retention policy (recommended: 7 days)
-
-### Production Environment Variables
-
-Create `/opt/i3-gateway/.env.production`:
-
-```bash
-# Production settings for LuminariMUD
-MUD_NAME=LuminariMUD
-MUD_PORT=4100
-MUD_ADMIN_EMAIL=max@aiwithapex.com
-MUD_TYPE=Circle
-MUD_STATUS=open
-
-# API Configuration
-API_WS_HOST=0.0.0.0
-API_WS_PORT=8080
-API_TCP_HOST=0.0.0.0
-API_TCP_PORT=8081
-API_AUTH_ENABLED=true
-API_KEY_LUMINARI=<generated-api-key>
-I3_GATEWAY_SECRET=<generated-secret>
-
-# I3 Router (Production)
-I3_ROUTER_HOST=204.209.44.3
-I3_ROUTER_PORT=8080
-
-# Logging (Production)
-LOG_LEVEL=WARNING
-LOG_FILE=/var/log/i3-gateway/production.log
-
-# Performance Tuning
-MAX_CONNECTIONS=500
-MESSAGE_QUEUE_SIZE=5000
-CACHE_TTL=600
-```
-
-### Systemd Service (Recommended for Production)
-
-A systemd service file is included in the repository. As root:
-
-```bash
-# Copy the service file
-cp /home/intermud3/Intermud3/i3-gateway.service /etc/systemd/system/
-
-# Create log directory
-mkdir -p /home/intermud3/logs
-chown intermud3:intermud3 /home/intermud3/logs
-
-# Enable and start the service
-systemctl daemon-reload
-systemctl enable i3-gateway
-systemctl start i3-gateway
-systemctl status i3-gateway
-```
-
-The included service file (`i3-gateway.service`):
+Use a deployment-specific service:
 
 ```ini
 [Unit]
-Description=Intermud3 Gateway Service
-After=network.target
+Description=Intermud3 Gateway
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=intermud3
 Group=intermud3
-WorkingDirectory=/home/intermud3/Intermud3
-Environment="PATH=/home/intermud3/Intermud3/venv/bin"
-ExecStart=/home/intermud3/Intermud3/venv/bin/python -m src
-Restart=always
+WorkingDirectory=/opt/intermud3/app
+EnvironmentFile=/etc/intermud3.env
+ExecStart=/opt/intermud3/app/.venv/bin/python -m src \
+  --config /opt/intermud3/app/config/config.yaml \
+  --env-file /dev/null
+Restart=on-failure
 RestartSec=10
-StandardOutput=append:/home/intermud3/logs/stdout.log
-StandardError=append:/home/intermud3/logs/stderr.log
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/intermud3 /var/log/intermud3
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Enable and start:
+Point the YAML state/log paths at the writable directories, for example:
+
+```yaml
+state:
+  directory: /var/lib/intermud3
+
+logging:
+  file: /var/log/intermud3/gateway.log
+```
+
+Then:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable i3-gateway
-sudo systemctl start i3-gateway
-sudo systemctl status i3-gateway
+sudo systemctl enable --now intermud3
+sudo systemctl status intermud3
+journalctl -u intermud3 -f
 ```
 
-### Supervisor Configuration
+The repository’s `i3-gateway.service` is a concrete example with
+`/home/intermud3/Intermud3` paths. Copying it unchanged is correct only when
+that exact layout exists.
 
-Create `/etc/supervisor/conf.d/i3-gateway.conf`:
+## Docker
 
-```ini
-[program:i3-gateway]
-command=/opt/i3-gateway/venv/bin/python -m src
-directory=/opt/i3-gateway
-user=i3gateway
-autostart=true
-autorestart=true
-startsecs=10
-stopwaitsecs=10
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/i3-gateway.log
-stdout_logfile_maxbytes=10MB
-stdout_logfile_backups=5
-environment=PATH="/opt/i3-gateway/venv/bin",MUD_NAME="YourMUD"
-```
-
-### Kubernetes Deployment
-
-```yaml
-# deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: i3-gateway
-  labels:
-    app: i3-gateway
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: i3-gateway
-  template:
-    metadata:
-      labels:
-        app: i3-gateway
-    spec:
-      containers:
-      - name: gateway
-        image: intermud3-gateway:latest
-        ports:
-        - containerPort: 4001
-        env:
-        - name: MUD_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: i3-config
-              key: mud_name
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          tcpSocket:
-            port: 4001
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          tcpSocket:
-            port: 4001
-          initialDelaySeconds: 5
-          periodSeconds: 5
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: i3-gateway
-spec:
-  selector:
-    app: i3-gateway
-  ports:
-  - port: 4001
-    targetPort: 4001
-  type: ClusterIP
-```
-
-## Monitoring
-
-### Health Check Endpoints
+### Build
 
 ```bash
-# HTTP health check
-curl http://localhost:8080/health
-
-# Expected response:
-# {
-#   "status": "healthy",
-#   "service": "i3-gateway-api",
-#   "websocket_connections": 0,
-#   "active_sessions": 0
-# }
-
-# Metrics endpoint
-curl http://localhost:8080/metrics
-
-# TCP health check (if TCP API enabled)
-nc -zv localhost 8081
+docker build --tag i3-gateway:0.4.4-beta .
 ```
 
-### Logging
-
-Log locations:
-- Development: `./logs/i3-gateway.log`
-- Docker: `/app/logs/i3-gateway.log`
-- Production: `/var/log/i3-gateway/i3-gateway.log`
-
-Log rotation configuration:
+### Compose gateway service
 
 ```bash
-# /etc/logrotate.d/i3-gateway
-/var/log/i3-gateway/*.log {
-    daily
-    rotate 7
-    compress
-    delaycompress
-    missingok
-    notifempty
-    create 0644 i3gateway i3gateway
-    postrotate
-        systemctl reload i3-gateway
-    endscript
-}
+cp .env.example .env
+# Edit .env and add the exact API_KEY_LUMINARI variable used by config.yaml.
+docker compose config
+docker compose up --build -d i3-gateway
+docker compose logs -f i3-gateway
 ```
 
-### Prometheus Metrics
+The base Compose service:
 
-Example Prometheus configuration:
+- exposes WebSocket/HTTP on 8080;
+- exposes TCP JSON-RPC on 8081;
+- mounts configuration read-only;
+- persists logs and state on host bind mounts;
+- uses `/health` for container health.
 
-```yaml
-scrape_configs:
-  - job_name: 'i3-gateway'
-    static_configs:
-      - targets: ['localhost:8080']
-    metrics_path: '/metrics'
-```
+The gateway serves metrics on its HTTP port at `:8080/metrics`. Its `9090:9090`
+mapping is not a separate gateway metrics listener. The optional Prometheus
+service also uses host port 9090, so remove or change the gateway’s unused 9090
+mapping before enabling the monitoring profile.
 
-## Troubleshooting
+The production overlay uses host bind locations under `/var/lib/i3-gateway`
+and `/var/log/i3-gateway`; create them with ownership compatible with container
+UID 1000 before startup.
 
-### Common Issues
+### Container secrets
 
-#### Connection Refused
-```bash
-# Check if service is running
-systemctl status i3-gateway
-ps aux | grep i3-gateway
+The provided Compose files use environment variables and a bind-mounted `.env`
+for convenience. For a serious deployment, use the platform’s secret mechanism
+or a root-owned environment file and ensure secrets do not appear in images,
+Compose source, or support bundles.
 
-# Check port binding
-netstat -tlnp | grep 4001
-ss -tlnp | grep 4001
+## Reverse proxy with TLS
 
-# Check firewall
-iptables -L -n | grep 4001
-ufw status
-```
-
-#### Cannot Connect to I3 Router
-```bash
-# Test router connectivity
-telnet 204.209.44.3 8080
-nc -zv 204.209.44.3 8080
-
-# Check DNS resolution
-nslookup your-mud.com
-
-# Verify configuration
-python -m src --validate-config
-```
-
-#### High Memory Usage
-```bash
-# Check memory usage
-ps aux | grep i3-gateway
-top -p $(pgrep -f i3-gateway)
-
-# Adjust cache settings
-CACHE_TTL=60 python -m src
-
-# Enable memory profiling
-LOG_LEVEL=DEBUG python -m src --profile-memory
-```
-
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-# Environment variable
-LOG_LEVEL=DEBUG python -m src
-
-# Command line
-python -m src --log-level DEBUG
-
-# Configuration file
-# Set logging.level: DEBUG in config.yaml
-```
-
-### Test Connection
-
-Test script to verify gateway connection:
-
-```python
-#!/usr/bin/env python3
-import socket
-import json
-
-def test_gateway():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('localhost', 4001))
-    
-    # Send ping
-    request = {
-        "jsonrpc": "2.0",
-        "method": "ping",
-        "id": 1
-    }
-    s.send(json.dumps(request).encode() + b'\n')
-    
-    # Receive response
-    response = s.recv(1024).decode()
-    print(f"Response: {response}")
-    
-    s.close()
-
-if __name__ == "__main__":
-    test_gateway()
-```
-
-## Backup and Recovery
-
-### Backup State
-
-```bash
-# Backup data directory
-tar -czf i3-gateway-backup-$(date +%Y%m%d).tar.gz data/
-
-# Backup with timestamp
-rsync -av --delete data/ backups/data-$(date +%Y%m%d)/
-```
-
-### Restore State
-
-```bash
-# Stop service
-systemctl stop i3-gateway
-
-# Restore data
-tar -xzf i3-gateway-backup-20240119.tar.gz
-
-# Start service
-systemctl start i3-gateway
-```
-
-## Security Considerations
-
-### Firewall Rules
-
-```bash
-# Allow gateway port
-ufw allow 4001/tcp comment 'I3 Gateway API'
-
-# Restrict to specific IP
-ufw allow from 192.168.1.100 to any port 4001
-
-# IPTables example
-iptables -A INPUT -p tcp --dport 4001 -s 192.168.1.0/24 -j ACCEPT
-```
-
-### SSL/TLS Configuration
-
-For production, consider using a reverse proxy with SSL:
+Example nginx location for WebSocket:
 
 ```nginx
-# nginx configuration
 server {
-    listen 443 ssl;
-    server_name i3gateway.yourmud.com;
-    
-    ssl_certificate /etc/ssl/certs/yourmud.crt;
-    ssl_certificate_key /etc/ssl/private/yourmud.key;
-    
-    location / {
-        proxy_pass http://localhost:4001;
+    listen 443 ssl http2;
+    server_name i3-api.example.net;
+
+    ssl_certificate /etc/letsencrypt/live/i3-api.example.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/i3-api.example.net/privkey.pem;
+
+    location /ws {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 3600s;
+    }
+
+    location ~ ^/(health|metrics|api/info) {
+        allow 127.0.0.1;
+        deny all;
+        proxy_pass http://127.0.0.1:8080;
     }
 }
 ```
 
-## Performance Tuning
+Protect metrics and detailed status rather than exposing them by default.
+Apply request/header/time limits at the proxy.
 
-### System Tuning
+## Health and monitoring
 
 ```bash
-# Increase file descriptors
-ulimit -n 65536
-
-# TCP tuning
-sysctl -w net.core.somaxconn=1024
-sysctl -w net.ipv4.tcp_tw_reuse=1
+curl --fail http://127.0.0.1:8080/health
+curl --fail http://127.0.0.1:8080/health/live
+curl --fail http://127.0.0.1:8080/health/ready
+curl --fail http://127.0.0.1:8080/metrics
 ```
 
-### Application Tuning
+Use:
 
-```yaml
-# config.yaml
-performance:
-  worker_threads: 4
-  async_workers: 10
-  connection_pool_size: 20
-  message_batch_size: 50
-  cache_size: 10000
-```
+- `/health/live` for process restart decisions;
+- `/health/ready` for router-dependent traffic;
+- logs for startup replies, list IDs, connection changes, and service errors.
+
+`/health` always reports the local API as healthy when its handler runs. It
+does not replace `/health/ready`.
+
+The current metrics endpoint exposes API WebSocket and active-session gauges.
+Do not configure dashboards for packet/latency series that the endpoint does
+not emit.
+
+## State, backup, and recovery
+
+Persistent files:
+
+| File | Purpose | Sensitivity |
+|---|---|---|
+| `mudlist.json` | Last synchronized MUD snapshot | low |
+| `channels.json` | Last synchronized channel snapshot | low |
+| `router-password` | Router-issued identity credential | high |
+
+State snapshots are saved on orderly shutdown. The router password is written
+immediately and atomically when assigned.
+
+Backup the state directory with restrictive permissions. Restoring the router
+password is important: losing it while reusing the same MUD name can require
+router-operator assistance. A stale mud/channel snapshot is less serious
+because startup requests a fresh list.
+
+The `save_interval`, `backup_enabled`, and `backup_count` configuration fields
+do not currently schedule backups. Use an external backup job.
+
+## Upgrade procedure
+
+1. Back up the state directory and secret configuration.
+2. Read [CHANGELOG.md](CHANGELOG.md).
+3. Install/build the new revision in a staging location.
+4. Run `python -m src --dry-run`.
+5. Run the project tests appropriate to the change.
+6. Stop the old process cleanly so state is saved.
+7. Start the new process.
+8. Verify `/health/ready`, mudlist/chanlist counts, and one non-destructive API
+   query.
+9. Keep the previous image/venv available for rollback; do not roll back the
+   newly issued router password separately from state.
+
+## Production checklist
+
+- [ ] Exact MUD name and public metadata reviewed
+- [ ] Router endpoint/name pair reviewed
+- [ ] Unique gateway secret and API keys installed
+- [ ] Example API keys removed or replaced
+- [ ] API bound to loopback/private network or protected by TLS proxy
+- [ ] TCP API disabled if unused
+- [ ] State directory persistent and mode-restricted
+- [ ] Router password included in protected backup
+- [ ] `/health/ready` used for router-aware monitoring
+- [ ] Logs rotate externally or through the configured handler
+- [ ] Firewall allows only required inbound API clients and outbound router TCP
+- [ ] Live command smoke test completed
+- [ ] Restore and rollback procedures exercised
+

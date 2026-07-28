@@ -316,14 +316,16 @@ class LocatePacket(I3Packet):
         base = [
             self.packet_type.value,
             self.ttl,
-            self.originator_mud,
-            self.originator_user,
+            self.originator_mud if self.originator_mud else 0,
+            self.originator_user if self.originator_user else 0,
             self.target_mud if self.target_mud else 0,  # 0 for broadcast
             self.target_user if self.target_user else 0,
         ]
 
         if self.packet_type == PacketType.LOCATE_REQ:
-            base.append(self.user_to_locate)
+            # I3 usernames are routed in lowercase. Some established mudlibs
+            # pass this value directly to find_player() and reject mixed case.
+            base.append(self.user_to_locate.lower())
         else:  # LOCATE_REPLY
             base.extend([self.located_mud, self.located_user, self.idle_time, self.status_string])
 
@@ -385,10 +387,10 @@ class ChannelPacket(I3Packet):
         return [
             self.packet_type.value,
             self.ttl,
-            self.originator_mud,
-            self.originator_user,
-            self.target_mud,
-            self.target_user,
+            self.originator_mud if self.originator_mud else 0,
+            self.originator_user if self.originator_user else 0,
+            self.target_mud if self.target_mud else 0,
+            self.target_user if self.target_user else 0,
             self.channel,
             self.message,
         ]
@@ -503,27 +505,90 @@ class WhoPacket(I3Packet):
         base = [
             self.packet_type.value,
             self.ttl,
-            self.originator_mud,
-            self.originator_user,
-            self.target_mud,
-            self.target_user,
+            self.originator_mud if self.originator_mud else 0,
+            self.originator_user if self.originator_user else 0,
+            self.target_mud if self.target_mud else 0,
+            self.target_user if self.target_user else 0,
         ]
 
         if self.packet_type == PacketType.WHO_REQ:
-            base.append(self.filter_criteria or {})
-        else:
-            base.append(self.who_data or [])
+            # The I3 who-req packet has exactly the six common fields.
+            # Filtering is a local API feature and has no standard wire field.
+            return base
 
+        users: list[list[Any]] = []
+        for user in self.who_data or []:
+            if isinstance(user, dict):
+                name = user.get("name", user.get("visname", ""))
+                idle = user.get("idle", user.get("idle_time", 0))
+                extra = user.get("extra", user.get("title", ""))
+                if isinstance(extra, dict):
+                    extra = ", ".join(
+                        f"{key}: {value}" for key, value in extra.items() if value
+                    )
+                try:
+                    level = int(user.get("level", 0))
+                except (TypeError, ValueError):
+                    level = 0
+                if level > 0:
+                    extra = f"Level {level}" + (f" - {extra}" if extra else "")
+                try:
+                    idle = int(idle)
+                except (TypeError, ValueError):
+                    idle = 0
+                users.append([str(name or ""), idle, str(extra or "")])
+            elif isinstance(user, (list, tuple)) and len(user) >= 3:
+                users.append([user[0], user[1], user[2]])
+
+        base.append(users)
         return base
 
     @classmethod
     def from_lpc_array(cls, data: list[Any]) -> "WhoPacket":
         """Create from LPC array."""
-        if len(data) < 7:
-            raise PacketValidationError(f"Invalid who packet: expected 7+ fields, got {len(data)}")
+        if len(data) < 6:
+            raise PacketValidationError(f"Invalid who packet: expected 6+ fields, got {len(data)}")
 
         packet_type_str = str(data[0]) if data[0] else ""
         packet_type = PacketType(packet_type_str)
+        if packet_type == PacketType.WHO_REPLY and len(data) < 7:
+            raise PacketValidationError(
+                f"Invalid who reply packet: expected 7+ fields, got {len(data)}"
+            )
+
+        filter_criteria = None
+        who_data = None
+        if packet_type == PacketType.WHO_REQ and len(data) > 6:
+            filter_criteria = data[6] if isinstance(data[6], dict) else {}
+        elif packet_type == PacketType.WHO_REPLY:
+            who_data = []
+            if isinstance(data[6], list):
+                for user in data[6]:
+                    if isinstance(user, dict):
+                        who_data.append(user)
+                    elif isinstance(user, (list, tuple)) and len(user) >= 3:
+                        try:
+                            idle = int(user[1])
+                        except (TypeError, ValueError):
+                            idle = 0
+                        extra = str(user[2]) if user[2] else ""
+                        level = 0
+                        if extra.startswith("Level "):
+                            level_text, separator, remainder = extra[6:].partition(" - ")
+                            try:
+                                level = int(level_text)
+                            except ValueError:
+                                level = 0
+                            else:
+                                extra = remainder if separator else ""
+                        who_data.append(
+                            {
+                                "name": str(user[0]) if user[0] else "Unknown",
+                                "idle": idle,
+                                "level": level,
+                                "extra": extra,
+                            }
+                        )
 
         packet = cls(
             packet_type=packet_type,
@@ -532,12 +597,9 @@ class WhoPacket(I3Packet):
             originator_user=str(data[3]) if data[3] else "",
             target_mud=str(data[4]) if data[4] else "",
             target_user=str(data[5]) if data[5] else "",
+            filter_criteria=filter_criteria,
+            who_data=who_data,
         )
-
-        if packet_type == PacketType.WHO_REQ and len(data) > 6:
-            packet.filter_criteria = data[6] if isinstance(data[6], dict) else {}
-        elif packet_type == PacketType.WHO_REPLY and len(data) > 6:
-            packet.who_data = data[6] if isinstance(data[6], list) else []
 
         return packet
 
@@ -568,16 +630,33 @@ class FingerPacket(I3Packet):
         base = [
             self.packet_type.value,
             self.ttl,
-            self.originator_mud,
-            self.originator_user,
-            self.target_mud,
-            self.target_user,
+            self.originator_mud if self.originator_mud else 0,
+            self.originator_user if self.originator_user else 0,
+            self.target_mud if self.target_mud else 0,
+            self.target_user if self.target_user else 0,
         ]
 
         if self.packet_type == PacketType.FINGER_REQ:
-            base.append(self.username)
-        else:
-            base.append(self.user_info or {})
+            base.append(self.username.lower())
+            return base
+
+        info = self.user_info or {}
+        extra = info.get("extra", "")
+        if isinstance(extra, dict):
+            extra = ", ".join(f"{key}: {value}" for key, value in extra.items() if value)
+        base.extend(
+            [
+                info.get("name", info.get("visname", "")) or 0,
+                info.get("title", "") or 0,
+                info.get("real_name", "") or 0,
+                info.get("email", info.get("e_mail", "")) or 0,
+                info.get("login_time", info.get("loginout_time", "")) or 0,
+                info.get("idle_time", info.get("idle", 0)),
+                info.get("ip_address", info.get("ip_name", "")) or 0,
+                info.get("level", 0),
+                extra or 0,
+            ]
+        )
 
         return base
 
@@ -592,6 +671,42 @@ class FingerPacket(I3Packet):
         packet_type_str = str(data[0]) if data[0] else ""
         packet_type = PacketType(packet_type_str)
 
+        username = ""
+        user_info = None
+        if packet_type == PacketType.FINGER_REQ and len(data) > 6:
+            username = str(data[6]) if data[6] else ""
+        elif packet_type == PacketType.FINGER_REPLY and len(data) > 6:
+            if isinstance(data[6], dict):
+                # Backward compatibility for the gateway's former internal-only
+                # reply shape.
+                user_info = data[6]
+            elif len(data) >= 15 and any(data[6:15]):
+                try:
+                    idle_time = int(data[11]) if data[11] else 0
+                except (TypeError, ValueError):
+                    idle_time = 0
+                try:
+                    level = int(data[13]) if data[13] else 0
+                except (TypeError, ValueError):
+                    level = 0
+                user_info = {
+                    "name": str(data[6]) if data[6] and str(data[6]) != "0" else "",
+                    "title": str(data[7]) if data[7] and str(data[7]) != "0" else "",
+                    "real_name": str(data[8]) if data[8] and str(data[8]) != "0" else "",
+                    "email": str(data[9]) if data[9] and str(data[9]) != "0" else "",
+                    "login_time": (
+                        str(data[10]) if data[10] and str(data[10]) != "0" else ""
+                    ),
+                    "idle_time": idle_time,
+                    "ip_address": (
+                        str(data[12]) if data[12] and str(data[12]) != "0" else ""
+                    ),
+                    "level": level,
+                    "extra": str(data[14]) if data[14] and str(data[14]) != "0" else "",
+                }
+            else:
+                user_info = {}
+
         packet = cls(
             packet_type=packet_type,
             ttl=int(data[1]) if data[1] else 0,
@@ -599,12 +714,9 @@ class FingerPacket(I3Packet):
             originator_user=str(data[3]) if data[3] else "",
             target_mud=str(data[4]) if data[4] else "",
             target_user=str(data[5]) if data[5] else "",
+            username=username,
+            user_info=user_info,
         )
-
-        if packet_type == PacketType.FINGER_REQ and len(data) > 6:
-            packet.username = str(data[6]) if data[6] else ""
-        elif packet_type == PacketType.FINGER_REPLY and len(data) > 6:
-            packet.user_info = data[6] if isinstance(data[6], dict) else {}
 
         return packet
 

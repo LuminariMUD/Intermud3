@@ -22,7 +22,8 @@ from src.state.manager import StateManager
 def mock_state_manager():
     """Create a mock state manager."""
     manager = Mock(spec=StateManager)
-    manager.get_session = AsyncMock()
+    manager.find_user_session = AsyncMock()
+    manager.has_current_presence = AsyncMock(return_value=True)
     return manager
 
 
@@ -115,7 +116,7 @@ class TestTellPacketHandling:
         self, tell_service, sample_tell_packet, mock_state_manager, online_user_session
     ):
         """Test handling tell to online user."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         result = await tell_service.handle_packet(sample_tell_packet)
 
@@ -129,7 +130,7 @@ class TestTellPacketHandling:
         self, tell_service, sample_tell_packet, mock_state_manager, offline_user_session
     ):
         """Test handling tell to offline user."""
-        mock_state_manager.get_session.return_value = offline_user_session
+        mock_state_manager.find_user_session.return_value = offline_user_session
 
         result = await tell_service.handle_packet(sample_tell_packet)
 
@@ -143,7 +144,7 @@ class TestTellPacketHandling:
         self, tell_service, sample_tell_packet, mock_state_manager
     ):
         """Test handling tell to nonexistent user."""
-        mock_state_manager.get_session.return_value = None
+        mock_state_manager.find_user_session.return_value = None
 
         result = await tell_service.handle_packet(sample_tell_packet)
 
@@ -154,7 +155,7 @@ class TestTellPacketHandling:
         self, tell_service, mock_state_manager, online_user_session
     ):
         """Test tell history is properly managed."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Send 25 tells to test history limit
         for i in range(25):
@@ -178,7 +179,7 @@ class TestTellPacketHandling:
         self, tell_service, mock_state_manager, online_user_session
     ):
         """Test that recent tells are properly updated."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Send tells from different users
         packet1 = TellPacket(
@@ -212,7 +213,7 @@ class TestEmotetoPacketHandling:
         self, tell_service, sample_emoteto_packet, mock_state_manager, online_user_session
     ):
         """Test handling emoteto to online user."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         result = await tell_service.handle_packet(sample_emoteto_packet)
 
@@ -224,7 +225,7 @@ class TestEmotetoPacketHandling:
         self, tell_service, sample_emoteto_packet, mock_state_manager, offline_user_session
     ):
         """Test handling emoteto to offline user."""
-        mock_state_manager.get_session.return_value = offline_user_session
+        mock_state_manager.find_user_session.return_value = offline_user_session
 
         result = await tell_service.handle_packet(sample_emoteto_packet)
 
@@ -236,7 +237,7 @@ class TestEmotetoPacketHandling:
         self, tell_service, sample_emoteto_packet, mock_state_manager, online_user_session
     ):
         """Test that emoteto updates recent tells."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         await tell_service.handle_packet(sample_emoteto_packet)
 
@@ -413,7 +414,7 @@ class TestUtilityMethods:
         self, tell_service, sample_tell_packet, mock_state_manager, online_user_session
     ):
         """Test getting last tell sender."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Initially no sender
         assert tell_service.get_last_tell_sender("receiver") is None
@@ -433,7 +434,7 @@ class TestUtilityMethods:
         self, tell_service, sample_tell_packet, mock_state_manager, online_user_session
     ):
         """Test getting tell history with messages."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Send some tells
         for i in range(3):
@@ -469,7 +470,7 @@ class TestEdgeCases:
         self, tell_service, mock_state_manager, online_user_session
     ):
         """Test handling concurrent tells to same user."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         # Create multiple tell packets
         packets = []
@@ -501,7 +502,7 @@ class TestEdgeCases:
         online_user_session,
     ):
         """Test that metrics are properly tracked."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
 
         assert tell_service.metrics.packets_handled == 0
 
@@ -516,7 +517,7 @@ class TestEdgeCases:
         self, mock_loop, tell_service, sample_tell_packet, mock_state_manager, online_user_session
     ):
         """Test that timestamps are added to history."""
-        mock_state_manager.get_session.return_value = online_user_session
+        mock_state_manager.find_user_session.return_value = online_user_session
         mock_loop.return_value.time.return_value = 12345.678
 
         await tell_service.handle_packet(sample_tell_packet)

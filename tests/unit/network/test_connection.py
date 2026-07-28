@@ -242,6 +242,33 @@ class TestConnectionManager:
         assert result is False
 
     @pytest.mark.asyncio
+    async def test_connect_retries_from_error_state(self):
+        """Test that an automatic retry can leave the error state."""
+        manager = ConnectionManager(self.routers)
+        manager.state = ConnectionState.ERROR
+
+        mock_transport = MagicMock()
+        mock_protocol = MagicMock(spec=MudModeStreamProtocol)
+
+        with (
+            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch.object(manager, "_set_state") as mock_set_state,
+            patch.object(manager, "_start_keepalive"),
+        ):
+            mock_loop = MagicMock()
+            mock_get_loop.return_value = mock_loop
+            mock_loop.create_connection = AsyncMock(
+                return_value=(mock_transport, mock_protocol)
+            )
+
+            result = await manager.connect()
+
+        assert result is True
+        mock_set_state.assert_has_calls(
+            [call(ConnectionState.CONNECTING), call(ConnectionState.CONNECTED)]
+        )
+
+    @pytest.mark.asyncio
     async def test_connect_primary_fails_fallback_succeeds(self):
         """Test fallback when primary fails."""
         manager = ConnectionManager(self.routers)
@@ -627,6 +654,7 @@ class TestConnectionManager:
 
             mock_sleep.assert_called_once()  # Should wait for backoff
             mock_connect.assert_called_once()
+            assert manager._reconnect_task is None
 
     @pytest.mark.asyncio
     async def test_reconnect_task_while_closing(self):

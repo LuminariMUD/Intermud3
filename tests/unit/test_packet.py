@@ -6,6 +6,8 @@ from src.models.packet import (
     ChannelMessagePacket,
     ChannelPacket,
     ErrorPacket,
+    FingerPacket,
+    LocatePacket,
     PacketFactory,
     PacketType,
     PacketValidationError,
@@ -260,6 +262,24 @@ class TestWhoPacket:
         assert packet.filter_criteria == {"level": ">10", "class": "wizard"}
         assert packet.who_data is None
 
+        assert packet.to_lpc_array() == [
+            "who-req",
+            200,
+            "TestMUD",
+            "testuser",
+            "TargetMUD",
+            0,
+        ]
+
+    def test_parse_standard_who_request_without_extension_field(self):
+        """The public I3 wire format has exactly six who-req fields."""
+        packet = WhoPacket.from_lpc_array(
+            ["who-req", 5, "TestMUD", "testuser", "TargetMUD", 0]
+        )
+
+        assert packet.packet_type == PacketType.WHO_REQ
+        assert packet.filter_criteria is None
+
     def test_create_who_reply(self):
         """Test creating who reply packet."""
         who_data = [
@@ -281,6 +301,46 @@ class TestWhoPacket:
         assert packet.who_data == who_data
         assert packet.filter_criteria is None
 
+    def test_standard_who_reply_converts_between_rows_and_api_objects(self):
+        """Who rows use positional arrays on I3 and objects inside the API."""
+        packet = WhoPacket(
+            packet_type=PacketType.WHO_REPLY,
+            ttl=5,
+            originator_mud="TargetMUD",
+            originator_user="",
+            target_mud="TestMUD",
+            target_user="testuser",
+            who_data=[
+                {
+                    "name": "Kohdee",
+                    "idle": 7,
+                    "level": 34,
+                    "extra": "the Game Master",
+                }
+            ],
+        )
+
+        wire = packet.to_lpc_array()
+        assert wire == [
+            "who-reply",
+            5,
+            "TargetMUD",
+            0,
+            "TestMUD",
+            "testuser",
+            [["Kohdee", 7, "Level 34 - the Game Master"]],
+        ]
+
+        restored = WhoPacket.from_lpc_array(wire)
+        assert restored.who_data == [
+            {
+                "name": "Kohdee",
+                "idle": 7,
+                "level": 34,
+                "extra": "the Game Master",
+            }
+        ]
+
     def test_who_packet_validation(self):
         """Test who packet validation."""
         # who-reply without data should fail
@@ -294,6 +354,96 @@ class TestWhoPacket:
                 target_user="",
                 who_data=None,
             )
+
+
+class TestFingerPacket:
+    """Test the standard positional finger packet codec."""
+
+    def test_standard_finger_reply_roundtrip(self):
+        packet = FingerPacket(
+            packet_type=PacketType.FINGER_REPLY,
+            ttl=5,
+            originator_mud="TargetMUD",
+            originator_user="",
+            target_mud="TestMUD",
+            target_user="testuser",
+            user_info={
+                "name": "Kohdee",
+                "title": "the Game Master",
+                "real_name": "",
+                "email": "",
+                "login_time": "2026-07-28T18:00:00",
+                "idle_time": 7,
+                "ip_address": "",
+                "level": 34,
+                "extra": {"race": "Human"},
+            },
+        )
+
+        wire = packet.to_lpc_array()
+        assert len(wire) == 15
+        assert wire[6:15] == [
+            "Kohdee",
+            "the Game Master",
+            0,
+            0,
+            "2026-07-28T18:00:00",
+            7,
+            0,
+            34,
+            "race: Human",
+        ]
+
+        restored = FingerPacket.from_lpc_array(wire)
+        assert restored.user_info == {
+            "name": "Kohdee",
+            "title": "the Game Master",
+            "real_name": "",
+            "email": "",
+            "login_time": "2026-07-28T18:00:00",
+            "idle_time": 7,
+            "ip_address": "",
+            "level": 34,
+            "extra": "race: Human",
+        }
+
+    def test_finger_request_lowercases_wire_username(self):
+        packet = FingerPacket(
+            packet_type=PacketType.FINGER_REQ,
+            ttl=5,
+            originator_mud="TestMUD",
+            originator_user="testuser",
+            target_mud="TargetMUD",
+            target_user="",
+            username="Kohdee",
+        )
+
+        assert packet.to_lpc_array()[6] == "kohdee"
+
+
+class TestLocatePacket:
+    """Test locate interoperability details."""
+
+    def test_locate_request_lowercases_wire_username(self):
+        packet = LocatePacket(
+            packet_type=PacketType.LOCATE_REQ,
+            ttl=5,
+            originator_mud="TestMUD",
+            originator_user="testuser",
+            target_mud="",
+            target_user="",
+            user_to_locate="Kohdee",
+        )
+
+        assert packet.to_lpc_array() == [
+            "locate-req",
+            5,
+            "TestMUD",
+            "testuser",
+            0,
+            0,
+            "kohdee",
+        ]
 
 
 class TestStartupPacket:

@@ -78,10 +78,11 @@ class TellService(BaseService):
             message_len=len(packet.message),
         )
 
-        # Check if target user exists and is online
-        user_session = await self.state_manager.get_session(packet.target_user)
+        local_mud = self.gateway.settings.mud.name if self.gateway else packet.target_mud
+        user_session = await self.state_manager.find_user_session(local_mud, packet.target_user)
+        presence_is_authoritative = await self.state_manager.has_current_presence(local_mud)
 
-        if not user_session or not user_session.is_online:
+        if presence_is_authoritative and (not user_session or not user_session.is_online):
             # User not online, send error reply
             self.logger.warning("Tell target user not online", target_user=packet.target_user)
 
@@ -151,10 +152,11 @@ class TellService(BaseService):
             message_len=len(packet.message),
         )
 
-        # Check if target user exists and is online
-        user_session = await self.state_manager.get_session(packet.target_user)
+        local_mud = self.gateway.settings.mud.name if self.gateway else packet.target_mud
+        user_session = await self.state_manager.find_user_session(local_mud, packet.target_user)
+        presence_is_authoritative = await self.state_manager.has_current_presence(local_mud)
 
-        if not user_session or not user_session.is_online:
+        if presence_is_authoritative and (not user_session or not user_session.is_online):
             # User not online, send error reply
             self.logger.warning("Emoteto target user not online", target_user=packet.target_user)
 

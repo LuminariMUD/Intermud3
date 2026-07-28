@@ -218,6 +218,20 @@ class UserSession:
     # Session state
     created_at: datetime = field(default_factory=datetime.now)
     last_activity: datetime = field(default_factory=datetime.now)
+    presence_updated_at: datetime = field(default_factory=datetime.now)
+    is_online: bool = True
+
+    # Public player information supplied by the local MUD
+    level: int = 0
+    title: str = ""
+    real_name: str = ""
+    email: str = ""
+    race: str = ""
+    guild: str = ""
+    location: str = ""
+    status_message: str = ""
+    ip_address: str = ""
+    login_time: datetime | None = None
 
     # User preferences
     blocked_users: set[str] = field(default_factory=set)

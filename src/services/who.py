@@ -122,10 +122,10 @@ class WhoService(BaseService):
         """
         online_users = []
 
-        # Get all sessions from state manager
-        sessions = self.state_manager.sessions
+        local_mud = self.gateway.settings.mud.name if self.gateway else "local"
+        sessions = await self.state_manager.get_sessions_for_mud(local_mud)
 
-        for session_id, session in sessions.items():
+        for session in sessions:
             if not session.is_online:
                 continue
 
@@ -161,10 +161,12 @@ class WhoService(BaseService):
             }
 
             # Add optional fields if available
-            if hasattr(session, "race") and session.race:
-                user_info["race"] = session.race
-            if hasattr(session, "guild") and session.guild:
-                user_info["guild"] = session.guild
+            race = getattr(session, "race", "")
+            guild = getattr(session, "guild", "")
+            if isinstance(race, str) and race:
+                user_info["race"] = race
+            if isinstance(guild, str) and guild:
+                user_info["guild"] = guild
 
             online_users.append(user_info)
 

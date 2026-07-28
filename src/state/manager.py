@@ -90,6 +90,8 @@ class TTLCache:
 class StateManager:
     """Manages gateway state and caching."""
 
+    PRESENCE_TTL_SECONDS = 30
+
     def __init__(self, persistence_dir: Path | None = None, cache_ttl: float = 300.0):
         """Initialize state manager.
 
@@ -114,6 +116,7 @@ class StateManager:
         # User sessions
         self.sessions: dict[str, UserSession] = {}
         self.session_lock = asyncio.Lock()
+        self.presence_snapshots: dict[str, datetime] = {}
 
         # Caching
         self.cache = TTLCache(default_ttl=cache_ttl)
@@ -324,6 +327,103 @@ class StateManager:
         """
         async with self.session_lock:
             self.sessions.pop(session_id, None)
+
+    async def sync_mud_presence(
+        self, mud_name: str, users: list[dict[str, Any]]
+    ) -> list[UserSession]:
+        """Replace one MUD's player presence with an authoritative snapshot."""
+        now = datetime.now()
+        mud_key = mud_name.casefold()
+        active_session_ids: set[str] = set()
+        synchronized: list[UserSession] = []
+
+        async with self.session_lock:
+            for user in users:
+                user_name = str(user["name"])
+                session_id = f"presence:{mud_key}:{user_name.casefold()}"
+                active_session_ids.add(session_id)
+                session = self.sessions.get(session_id)
+                if session is None:
+                    session = UserSession(
+                        session_id=session_id,
+                        mud_name=mud_name,
+                        user_name=user_name,
+                        authenticated=True,
+                        auth_time=now,
+                    )
+                    self.sessions[session_id] = session
+
+                idle_seconds = int(user.get("idle", 0))
+                session.mud_name = mud_name
+                session.user_name = user_name
+                session.authenticated = True
+                session.is_online = True
+                session.last_activity = now - timedelta(seconds=idle_seconds)
+                session.presence_updated_at = now
+                session.level = int(user.get("level", 0))
+                session.title = str(user.get("title", ""))
+                session.real_name = str(user.get("real_name", ""))
+                session.email = str(user.get("email", ""))
+                session.race = str(user.get("race", ""))
+                session.guild = str(user.get("guild", ""))
+                session.location = str(user.get("location", ""))
+                session.status_message = str(user.get("status", ""))
+                session.ip_address = str(user.get("ip_address", ""))
+
+                login_time = user.get("login_time")
+                if isinstance(login_time, int | float) and login_time > 0:
+                    session.login_time = datetime.fromtimestamp(login_time)
+                elif isinstance(login_time, str) and login_time:
+                    try:
+                        session.login_time = datetime.fromisoformat(login_time)
+                    except ValueError:
+                        session.login_time = None
+                else:
+                    session.login_time = None
+
+                synchronized.append(session)
+
+            stale_session_ids = [
+                session_id
+                for session_id, session in self.sessions.items()
+                if session.mud_name.casefold() == mud_key
+                and session_id.startswith("presence:")
+                and session_id not in active_session_ids
+            ]
+            for session_id in stale_session_ids:
+                del self.sessions[session_id]
+
+            self.presence_snapshots[mud_key] = now
+
+        return synchronized
+
+    async def has_current_presence(self, mud_name: str) -> bool:
+        """Return whether a MUD supplied a recent authoritative snapshot."""
+        cutoff = datetime.now() - timedelta(seconds=self.PRESENCE_TTL_SECONDS)
+        async with self.session_lock:
+            return self.presence_snapshots.get(mud_name.casefold(), datetime.min) >= cutoff
+
+    async def get_sessions_for_mud(self, mud_name: str) -> list[UserSession]:
+        """Return online players from a MUD's current presence snapshot."""
+        cutoff = datetime.now() - timedelta(seconds=self.PRESENCE_TTL_SECONDS)
+        mud_key = mud_name.casefold()
+        async with self.session_lock:
+            return [
+                session
+                for session in self.sessions.values()
+                if session.mud_name.casefold() == mud_key
+                and session.is_online
+                and session.presence_updated_at >= cutoff
+            ]
+
+    async def find_user_session(self, mud_name: str, user_name: str) -> UserSession | None:
+        """Find an online player by case-insensitive MUD and user names."""
+        user_key = user_name.casefold()
+        sessions = await self.get_sessions_for_mud(mud_name)
+        return next(
+            (session for session in sessions if session.user_name.casefold() == user_key),
+            None,
+        )
 
     async def get_active_sessions(self) -> list[UserSession]:
         """Get list of active sessions.

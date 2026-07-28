@@ -35,7 +35,7 @@ class I3Gateway:
             cache_ttl=300.0,
         )
 
-        self.service_manager = ServiceManager(self.state_manager)
+        self.service_manager = ServiceManager(self.state_manager, self.send_packet)
 
         # Import and register router service
         from .services.router import RouterService
@@ -91,6 +91,7 @@ class I3Gateway:
 
         # Start components
         await self.state_manager.start()
+        await self._register_services()
         await self.service_manager.start()
 
         # Start packet processing
@@ -112,6 +113,25 @@ class I3Gateway:
             )
 
         self.logger.info("I3 Gateway started successfully")
+
+    async def _register_services(self) -> None:
+        """Register enabled services that consume packets from the I3 router."""
+        from .services.channel import ChannelService
+        from .services.finger import FingerService
+        from .services.locate import LocateService
+        from .services.tell import TellService
+        from .services.who import WhoService
+
+        service_classes = {
+            "tell": TellService,
+            "channel": ChannelService,
+            "who": WhoService,
+            "finger": FingerService,
+            "locate": LocateService,
+        }
+        for service_name, service_class in service_classes.items():
+            if getattr(self.settings.mud.services, service_name, False):
+                await self.service_manager.registry.register(service_class, self)
 
     async def shutdown(self) -> None:
         """Shutdown the I3 Gateway service."""
@@ -337,27 +357,7 @@ class I3Gateway:
             try:
                 # Get packet with timeout
                 packet = await asyncio.wait_for(self.packet_queue.get(), timeout=1.0)
-
-                # Handle special router packets first
-                if packet.packet_type == PacketType.MUDLIST:
-                    await self._handle_mudlist(packet)
-                elif packet.packet_type == PacketType.CHANLIST_REPLY:
-                    await self._handle_chanlist(packet)
-                elif packet.packet_type == PacketType.STARTUP_REPLY:
-                    await self._handle_startup_reply(packet)
-                elif packet.packet_type == PacketType.ERROR:
-                    await self._handle_error(packet)
-                # Route packet through router service
-                # This will handle local vs remote routing
-                elif self.router_service:
-                    await self.router_service.route_packet(packet)
-                    # Also send packet to event bridge for API event generation
-                    await event_bridge.process_incoming_packet(packet)
-                else:
-                    # Fallback to direct service routing
-                    await self.service_manager.queue_packet(packet)
-                    # Also send packet to event bridge for API event generation
-                    await event_bridge.process_incoming_packet(packet)
+                await self._process_packet(packet)
 
             except TimeoutError:
                 continue
@@ -365,6 +365,33 @@ class I3Gateway:
                 break
             except Exception as e:
                 self.logger.error("Error processing packet", error=str(e))
+
+    async def _process_packet(self, packet: I3Packet) -> None:
+        """Consume one packet received from the upstream I3 router."""
+        if packet.packet_type == PacketType.MUDLIST:
+            await self._handle_mudlist(packet)
+            return
+        if packet.packet_type == PacketType.CHANLIST_REPLY:
+            await self._handle_chanlist(packet)
+            return
+        if packet.packet_type == PacketType.STARTUP_REPLY:
+            await self._handle_startup_reply(packet)
+            return
+        if packet.packet_type == PacketType.ERROR:
+            await self._handle_error(packet)
+            await event_bridge.process_incoming_packet(packet)
+            return
+        if packet.ttl <= 0:
+            self.logger.warning(
+                "Dropping incoming packet with expired TTL",
+                packet_type=packet.packet_type.value,
+            )
+            return
+
+        response = await self.service_manager.registry.route_packet(packet)
+        if response:
+            await self.send_packet(response)
+        await event_bridge.process_incoming_packet(packet)
 
     async def _handle_mudlist(self, packet: Any):
         """Handle mudlist update from router.
@@ -416,7 +443,15 @@ class I3Gateway:
 
         if isinstance(packet, ErrorPacket):
             self.logger.error(
-                "Router error", error_code=packet.error_code, error_message=packet.error_message
+                "Router error",
+                from_mud=packet.originator_mud,
+                error_code=packet.error_code,
+                error_message=packet.error_message,
+                bad_packet_type=(
+                    packet.bad_packet[0]
+                    if packet.bad_packet and isinstance(packet.bad_packet[0], str)
+                    else ""
+                ),
             )
 
     def get_stats(self) -> dict[str, Any]:

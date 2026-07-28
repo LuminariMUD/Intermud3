@@ -269,6 +269,39 @@ class TestEventBridge:
             mock_dispatcher.dispatch.assert_called_once_with(mock_event)
 
     @pytest.mark.asyncio
+    async def test_locate_broadcast_rejections_are_not_sent_to_players(self, bridge):
+        """Unsupported peers must not make a successful locate look failed."""
+        bridge.start()
+        packet = ErrorPacket(
+            ttl=5,
+            originator_mud="LegacyMUD",
+            originator_user="",
+            target_mud="TestMUD",
+            target_user="testuser",
+            error_code="unk-type",
+            error_message="type 'locate-req' is unrecognized",
+            bad_packet=[
+                "locate-req",
+                5,
+                "TestMUD",
+                "testuser",
+                0,
+                0,
+                "kohdee",
+            ],
+        )
+
+        with patch("src.api.event_bridge.event_dispatcher") as mock_dispatcher:
+            mock_dispatcher.create_event = MagicMock()
+            mock_dispatcher.dispatch = AsyncMock()
+
+            await bridge.process_incoming_packet(packet)
+
+            mock_dispatcher.create_event.assert_not_called()
+            mock_dispatcher.dispatch.assert_not_awaited()
+            assert bridge.stats["events_generated"] == 0
+
+    @pytest.mark.asyncio
     async def test_process_unknown_packet_type(self, bridge):
         """Test processing unknown packet type."""
         bridge.start()

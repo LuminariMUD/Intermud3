@@ -29,6 +29,16 @@ logger = structlog.get_logger(__name__)
 class APIHandlers:
     """Handles all API method calls."""
 
+    MAX_PRESENCE_USERS = 512
+    PRESENCE_STRING_LIMITS = (
+        ("name", 128),
+        ("title", 256),
+        ("race", 128),
+        ("guild", 128),
+        ("location", 256),
+        ("status", 256),
+    )
+
     def __init__(self, gateway=None, state_manager=None):
         """Initialize API handlers.
 
@@ -61,6 +71,7 @@ class APIHandlers:
             "finger": self.handle_finger,
             "locate": self.handle_locate,
             "mudlist": self.handle_mudlist,
+            "presence_sync": self.handle_presence_sync,
             # Administrative
             "ping": self.handle_ping,
             "status": self.handle_status,
@@ -85,6 +96,71 @@ class APIHandlers:
     async def handle_authenticate(self, session: Session, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle authentication - but this is usually done at connection level."""
         return {"status": "success", "mud_name": session.mud_name, "session_id": session.session_id}
+
+    async def handle_presence_sync(
+        self, session: Session, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Replace the authenticated MUD's public online-player snapshot."""
+        users = params.get("users")
+        if not isinstance(users, list):
+            raise ValueError("Missing or invalid required parameter: users")
+        if len(users) > self.MAX_PRESENCE_USERS:
+            raise ValueError(f"Presence snapshot exceeds {self.MAX_PRESENCE_USERS} users")
+
+        normalized_users: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+        for index, user in enumerate(users):
+            if not isinstance(user, dict):
+                raise ValueError(f"Presence user {index} must be an object")
+
+            normalized: dict[str, Any] = {}
+            for field_name, maximum_length in self.PRESENCE_STRING_LIMITS:
+                value = user.get(field_name, "")
+                if not isinstance(value, str):
+                    raise ValueError(f"Presence user {index} field {field_name} must be a string")
+                if len(value) > maximum_length:
+                    raise ValueError(f"Presence user {index} field {field_name} is too long")
+                if value and (value != value.strip() or not value.isprintable()):
+                    raise ValueError(f"Presence user {index} field {field_name} is invalid")
+                normalized[field_name] = value
+
+            if not normalized["name"]:
+                raise ValueError(f"Presence user {index} requires a name")
+            name_key = normalized["name"].casefold()
+            if name_key in seen_names:
+                raise ValueError("Presence snapshot contains duplicate user names")
+            seen_names.add(name_key)
+
+            for field_name, maximum_value in (
+                ("level", 1000),
+                ("idle", 31_536_000),
+            ):
+                value = user.get(field_name, 0)
+                if isinstance(value, bool) or not isinstance(value, int):
+                    raise ValueError(f"Presence user {index} field {field_name} must be an integer")
+                if value < 0 or value > maximum_value:
+                    raise ValueError(f"Presence user {index} field {field_name} is out of range")
+                normalized[field_name] = value
+
+            login_time = user.get("login_time", 0)
+            if isinstance(login_time, bool) or not isinstance(login_time, int | float | str):
+                raise ValueError(f"Presence user {index} field login_time is invalid")
+            if isinstance(login_time, int | float):
+                if login_time < 0 or login_time > 32_503_680_000:
+                    raise ValueError(f"Presence user {index} field login_time is out of range")
+            elif len(login_time) > 64:
+                raise ValueError(f"Presence user {index} field login_time is too long")
+            normalized["login_time"] = login_time
+            normalized_users.append(normalized)
+
+        synchronized = await self.state_manager.sync_mud_presence(
+            session.mud_name, normalized_users
+        )
+        return {
+            "status": "synchronized",
+            "mud_name": session.mud_name,
+            "count": len(synchronized),
+        }
 
     # Communication Methods
 
@@ -294,8 +370,6 @@ class APIHandlers:
         """
         channel = params.get("channel")
         listen_only = params.get("listen_only", False)
-        user_name = params.get("user_name")
-
         if not channel:
             raise ValueError("Missing required parameter: channel")
 
@@ -309,9 +383,9 @@ class APIHandlers:
                 packet_type=PacketType.CHANNEL_LISTEN,
                 ttl=5,
                 originator_mud=session.mud_name,
-                originator_user=user_name or "*",
-                target_mud="*",
-                target_user="*",
+                originator_user="",
+                target_mud="",
+                target_user="",
                 channel=channel,
                 message=str(1),  # 1 = join, 0 = leave
             )
@@ -336,8 +410,6 @@ class APIHandlers:
             {status, channel}
         """
         channel = params.get("channel")
-        user_name = params.get("user_name")
-
         if not channel:
             raise ValueError("Missing required parameter: channel")
 
@@ -351,9 +423,9 @@ class APIHandlers:
                 packet_type=PacketType.CHANNEL_LISTEN,
                 ttl=5,
                 originator_mud=session.mud_name,
-                originator_user=user_name or "*",
-                target_mud="*",
-                target_user="*",
+                originator_user="",
+                target_mud="",
+                target_user="",
                 channel=channel,
                 message=str(0),  # 0 = leave
             )
@@ -510,7 +582,7 @@ class APIHandlers:
             originator_mud=session.mud_name,
             originator_user=from_user,
             target_mud=target_mud,
-            target_user="*",
+            target_user="",
             filter_criteria=filters,
         )
         if not await self.gateway.send_packet(packet):
@@ -545,7 +617,7 @@ class APIHandlers:
             originator_mud=session.mud_name,
             originator_user=from_user,
             target_mud=target_mud,
-            target_user="*",
+            target_user="",
             username=target_user,
         )
         if not await self.gateway.send_packet(packet):
