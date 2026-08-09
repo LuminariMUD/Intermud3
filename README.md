@@ -19,6 +19,17 @@ That lets Diku/CircleMUD derivatives, custom engines, web services, and other
 non-LPC systems participate without embedding an LPC parser or I3 router state
 machine in the game.
 
+## LuminariMUD Eco-System
+
+What we call the "Lumiverse":
+
+- [LuminariMUD game server](https://github.com/LuminariMUD/Luminari-Source)
+- [Sage GraphRAG lore and world building](https://github.com/LuminariMUD/sage)
+- [Luminari web client](https://github.com/LuminariMUD/luminariweb)
+- [Discord bridge](https://github.com/LuminariMUD/discord-mud-chat)
+- [Wilderness editor](https://github.com/LuminariMUD/wildeditor)
+- [Mudlet interface](https://github.com/LuminariMUD/LuminariGUI)
+
 ## Verified interoperability
 
 This is not documentation-only protocol compatibility. On 2026-07-28, the
