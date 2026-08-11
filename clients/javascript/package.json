@@ -44,18 +44,18 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "ws": "^8.21.1"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "@types/ws": "^8.18.1",
-    "eslint": "^10.8.0",
-    "globals": "^17.8.0",
+    "eslint": "^10.8.1",
+    "globals": "^17.9.0",
     "prettier": "^3.9.6"
   },
   "peerDependencies": {
-    "ws": "^8.21.1"
+    "ws": "^8.21.3"
   },
   "peerDependenciesMeta": {
     "ws": {
